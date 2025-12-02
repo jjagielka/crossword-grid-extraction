@@ -1,0 +1,42 @@
+[Unit]
+Description=Crossword MCP Server
+Documentation=https://github.com/jjagielka/crossword-grid-extraction
+After=network.target
+
+[Service]
+Type=simple
+User=%USER%
+Group=%GROUP%
+WorkingDirectory=%PROJECT_DIR%
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+# Run the MCP server in HTTP/SSE mode using system Python
+# The --http flag enables persistent HTTP server mode (suitable for systemd)
+# Default port: 8000 (configurable via --port argument)
+ExecStart=/usr/bin/python %PROJECT_DIR%/src/mcp_server.py --http
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crossword-mcp
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/tmp
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

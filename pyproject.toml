@@ -1,0 +1,45 @@
+[project]
+name = "crossword-grid-extraction"
+version = "0.1.0"
+description = "Computer vision tool for extracting crossword grids from images"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Jakub Jagielka", email = "jjagielka@gmail.com"}
+]
+dependencies = [
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "fire>=0.5.0",
+    "loguru>=0.7.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/jjagielka/crossword-grid-extraction"
+Repository = "https://github.com/jjagielka/crossword-grid-extraction"
+Issues = "https://github.com/jjagielka/crossword-grid-extraction/issues"
+
+[project.scripts]
+crossword-grid-extraction = "crossword:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "mypy>=1.5.0",
+    "ruff>=0.1.0",
+]
+mcp = [
+    "fastmcp>=2.0.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true

@@ -1,0 +1,47 @@
+# Test Data
+
+This folder contains test images and expected results for the test suite.
+
+## Test Images
+
+- **nyt1.png** - First NYT crossword test image (15×15 grid)
+- **nyt2.jpg** - Second NYT crossword test image (20×21 grid)
+
+## Expected Results
+
+- **nyt1_result.txt** - Expected binary matrix for nyt1.png (15×15)
+- **nyt2_result.txt** - Expected binary matrix for nyt2.jpg (20×21)
+
+## Format
+
+The result files contain numpy array representations with:
+- `0` = Black cell (blocked)
+- `1` = White cell (fillable)
+
+Example format:
+```
+[[0 1 0 1 0 1 0 1 0 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 0 1 0 1 0 1 0]
+ ...]
+```
+
+## Adding New Test Cases
+
+To add new test data:
+
+1. Add crossword image: `test_data/crosswordN.jpg`
+2. Generate expected result:
+   ```bash
+   python crossword.py --input=test_data/crosswordN.jpg convert --output=test_data/resultN.txt
+   ```
+3. Manually verify the output is correct
+4. Add fixtures in `tests/conftest.py`
+5. Add test in `tests/test_crossword.py`
+
+## Usage in Tests
+
+These files are loaded by pytest fixtures defined in `tests/conftest.py`:
+- `test_image_crossword1` - Loads nyt1.png
+- `test_image_crossword2` - Loads nyt2.jpg
+- `expected_result1` - Loads and parses nyt1_result.txt
+- `expected_result2` - Loads and parses nyt2_result.txt

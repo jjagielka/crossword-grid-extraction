@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "crossword-extractor": {
+      "command": "python",
+      "args": ["/absolute/path/to/crossword-read/src/mcp_server.py"],
+      "env": {}
+    }
+  }
+}
