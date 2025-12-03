@@ -87,8 +87,11 @@ def cmd_size(args: argparse.Namespace) -> None:
     """
     image = load_image(args.input)
 
-    # Detect dimensions
-    cols, rows = detect_grid_dimensions(image)
+    # Extract and straighten the grid first
+    warped, max_width, max_height = extract_grid(image)
+
+    # Detect dimensions on the warped/straightened grid
+    cols, rows = detect_grid_dimensions(warped)
     logger.info(f"Detected grid dimensions: {cols} columns x {rows} rows")
 
 

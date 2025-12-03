@@ -208,22 +208,16 @@ def detect_grid_dimensions(
         median_col_width = np.median(col_diffs)
         estimated_cols = round(width / median_col_width)
 
-        # Adaptive refinement: Detect if we have over-detection (too many peaks)
-        # This happens when grid lines have thick borders or internal structure is detected
-        # Check if detected columns is unreasonably high (>30 is suspicious for typical crosswords)
-        if estimated_cols > 30 or len(col_diffs) > 30:
-            # Try clustering: if we have many closely-spaced peaks, they might be duplicates
-            # Look for natural breaks in the spacing distribution
+        # Bimodal distribution detection for columns (similar to rows)
+        # This detects when we're finding both edges of thick grid lines
+        if len(col_diffs) > 4:
             sorted_diffs = np.sort(col_diffs)
             spacing_gaps = np.diff(sorted_diffs)
-
             if len(spacing_gaps) > 0:
                 max_gap_idx = np.argmax(spacing_gaps)
                 max_gap = spacing_gaps[max_gap_idx]
-
-                # If the largest gap is significant (>15% of median), try refinement
-                # Lower threshold for suspected over-detection cases
-                if max_gap > median_col_width * 0.15:
+                # Use 20% threshold to detect bimodal distribution
+                if max_gap > median_col_width * 0.2:
                     larger_spacings = sorted_diffs[max_gap_idx + 1:]
                     if len(larger_spacings) >= 3:
                         refined_min_distance = int(np.median(larger_spacings) * 0.85)
@@ -236,7 +230,7 @@ def detect_grid_dimensions(
                                 estimated_cols = estimated_cols_refined
                                 peaks_cols = peaks_cols_refined
                                 median_col_width = median_col_width_refined
-                                logger.debug(f"Refined column detection (over-detection): {len(peaks_cols)} peaks → {estimated_cols} columns")
+                                logger.debug(f"Refined column detection (bimodal distribution): {len(peaks_cols)} peaks → {estimated_cols} columns")
 
     if len(peaks_rows) > 1:
         row_diffs = np.diff(peaks_rows)
