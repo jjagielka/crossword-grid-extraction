@@ -18,26 +18,30 @@ uv pip install -e ".[dev]"
 ```
 
 ### Running the Application
-The application uses `fire` for CLI and can be invoked directly:
+The application uses `argparse` for CLI and can be invoked directly:
 
 ```bash
 # Extract and straighten the grid
-python src/crossword.py --input=crosswords1.jpg extract --output=grid.jpg
+python src/crossword.py --input crosswords1.jpg extract --output grid.jpg
 
 # Detect grid dimensions (columns x rows)
-python src/crossword.py --input=crosswords1.jpg size
+python src/crossword.py --input crosswords1.jpg size
 
 # Full conversion: extract, detect, convert to CSV
-python src/crossword.py --input=crosswords1.jpg convert --output=grid.csv
+python src/crossword.py --input crosswords1.jpg convert --output grid.csv
 
 # Use custom intensity threshold
-python src/crossword.py --input=crosswords1.jpg convert --threshold=150
+python src/crossword.py --input crosswords1.jpg convert --output grid.csv --threshold 150
 
 # Enable visualization mode (shows detected contours)
-python src/crossword.py --input=crosswords1.jpg extract --visualize
+python src/crossword.py --input crosswords1.jpg extract --visualize
 
 # Enable verbose logging (TRACE level)
-python src/crossword.py --input=crosswords1.jpg --verbose convert
+python src/crossword.py --input crosswords1.jpg --verbose convert --output grid.csv
+
+# Get help
+python src/crossword.py --help
+python src/crossword.py --input image.jpg convert --help
 ```
 
 ### Development Tools
@@ -62,33 +66,55 @@ All dependencies are declared in `pyproject.toml`:
 - `opencv-python>=4.8.0` - Image processing and computer vision
 - `numpy>=1.24.0` - Numerical operations and matrix manipulation
 - `scipy>=1.10.0` - Signal processing (peak detection for grid lines)
-- `fire>=0.5.0` - CLI interface
 - `loguru>=0.7.0` - Structured logging
 
+Note: The CLI uses Python's built-in `argparse` module (no external dependency required).
+
 ## Architecture
+
+### Module Structure
+
+The codebase is organized into two main modules:
+
+1. **`src/extract.py`** - Core image processing library
+   - Contains all computer vision algorithms and grid extraction logic
+   - Designed to be reusable by multiple interfaces (CLI, MCP server, etc.)
+   - Exports: `extract_grid()`, `detect_grid_dimensions()`, `convert_to_matrix()`, `save_matrix_to_csv()`
+   - Exceptions: `GridExtractionError`, `DimensionDetectionError`
+
+2. **`src/crossword.py`** - CLI interface
+   - Provides command-line interface using argparse
+   - Imports and calls functions directly from `extract.py`
+   - Handles argument parsing, logging configuration, and error handling
+   - Command handlers: `cmd_extract()`, `cmd_size()`, `cmd_convert()`
+   - Helper functions: `load_image()`, `_create_visualization()`
+   - Main entry point: `main()` function
 
 ### Processing Pipeline
 
 The application follows a three-stage pipeline:
 
-1. **Grid Extraction** (`extract_grid`)
+1. **Grid Extraction** (`extract_grid` in `extract.py`)
    - Applies adaptive thresholding to handle shadows/lighting variations
    - Detects the largest quadrilateral contour (the crossword boundary)
    - Performs perspective transform to straighten the grid
    - Returns warped image with computed dimensions
 
-2. **Dimension Detection** (`detect_grid_dimensions`)
+2. **Dimension Detection** (`detect_grid_dimensions` in `extract.py`)
    - Uses projection profiles (sum of pixel intensities along axes)
    - Applies peak detection on inverted projections to find grid lines
    - Calculates median cell size from detected peaks
+   - Includes bimodal distribution refinement to handle double-detected grid lines
+   - Cross-validation: uses successfully detected dimension to validate the other
    - Estimates rows/columns by dividing image dimensions by median cell size
    - Robust to missing or faint grid lines through median-based approach
 
-3. **Grid Conversion** (`convert`)
+3. **Grid Conversion** (`convert_to_matrix` in `extract.py`)
    - Slices straightened image into individual cells based on detected dimensions
-   - Samples center region of each cell (50% of cell area) to avoid grid line interference
-   - Classifies cells as black (0) or white (1) based on average intensity threshold (140)
-   - Outputs binary matrix and optionally saves to CSV
+   - Samples center region of each cell (configurable margin) to avoid grid line interference
+   - Classifies cells as black (0) or white (1) based on intensity threshold
+   - Uses Otsu's method for automatic threshold detection if not specified
+   - Returns binary matrix; optionally saves to CSV via `save_matrix_to_csv()`
 
 ### Key Algorithms
 

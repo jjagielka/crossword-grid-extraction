@@ -16,11 +16,11 @@ import numpy as np
 from fastmcp import FastMCP
 from loguru import logger
 
-# Import crossword extraction functions
-from crossword import (
+# Import core extraction functions from library
+from extract import (
     extract_grid,
     detect_grid_dimensions,
-    convert,
+    convert_to_matrix,
     GridExtractionError,
     DimensionDetectionError,
 )
@@ -111,13 +111,12 @@ def extract_crossword_grid(
 
             # Step 3: Convert to binary matrix
             logger.info("Step 3/3: Converting to binary matrix...")
-            grid_matrix = convert(
+            grid_matrix = convert_to_matrix(
                 warped,
                 max_width,
                 max_height,
                 rows,
                 cols,
-                output_path=None,  # Don't save to file
                 intensity_threshold=intensity_threshold,
             )
 
