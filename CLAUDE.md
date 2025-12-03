@@ -27,8 +27,11 @@ python src/crossword.py --input crosswords1.jpg extract --output grid.jpg
 # Detect grid dimensions (columns x rows)
 python src/crossword.py --input crosswords1.jpg size
 
-# Full conversion: extract, detect, convert to CSV
+# Full conversion: extract, detect, convert to CSV (with dot detection)
 python src/crossword.py --input crosswords1.jpg convert --output grid.csv
+
+# Disable dot detection (output only 0=black, 1=white)
+python src/crossword.py --input crosswords1.jpg convert --output grid.csv --no-detect-dots
 
 # Use custom intensity threshold
 python src/crossword.py --input crosswords1.jpg convert --output grid.csv --threshold 150
@@ -112,9 +115,13 @@ The application follows a three-stage pipeline:
 3. **Grid Conversion** (`convert_to_matrix` in `extract.py`)
    - Slices straightened image into individual cells based on detected dimensions
    - Samples center region of each cell (configurable margin) to avoid grid line interference
-   - Classifies cells as black (0) or white (1) based on intensity threshold
+   - Classifies cells based on intensity threshold:
+     - 0 = black cell (filled/blocked)
+     - 1 = white cell (empty)
+     - 2 = white cell with black dot in bottom-right corner (solution letter marker)
+   - Dot detection examines bottom-right corner region for dark pixels
    - Uses Otsu's method for automatic threshold detection if not specified
-   - Returns binary matrix; optionally saves to CSV via `save_matrix_to_csv()`
+   - Returns ternary matrix (0/1/2); saves to CSV via `save_matrix_to_csv()`
 
 ### Key Algorithms
 
@@ -144,11 +151,30 @@ The `Application` class serves as the main interface:
 ## Output Files
 
 - `extracted_grid.jpg` - Straightened/warped crossword grid image
-- `crossword_grid.csv` - Binary matrix representation (when `save=True`)
+- `crossword_grid.csv` - Matrix representation with values:
+  - `0` = black cell (filled/blocked)
+  - `1` = white cell (empty)
+  - `2` = white cell with black dot (solution letter location)
 
 ## Image Processing Notes
 
-## Recent Improvements (v0.1.0)
+## Recent Improvements
+
+### v0.2.0 - Dot Detection Feature
+- **Solution marker detection**: Automatically detects black dots in white cells
+- **Ternary output**: Matrix now supports 0 (black), 1 (white), 2 (white with dot)
+- **Configurable**: Can be enabled/disabled via `--detect-dots` / `--no-detect-dots` flags
+- **Smart detection**: Checks bottom-right corner region for dark pixels
+- **MCP integration**: Dot detection available in MCP server tool
+
+### v0.1.1 - CLI Refactoring
+- **Replaced Fire with argparse**: CLI now uses Python's built-in argparse module
+- **Functional design**: Removed unnecessary class wrapper, using direct function calls
+- **Reduced dependencies**: Removed `fire>=0.5.0` from requirements
+- **Simpler code**: 275 lines vs ~300, clearer structure
+- **Better help**: Professional help messages with usage examples
+
+### v0.1.0 - Core Algorithm Improvements
 
 The codebase has been significantly refactored with the following enhancements:
 
@@ -211,6 +237,13 @@ The median-based approach for dimension detection handles:
 - Missing grid lines (faint printing)
 - Partially visible grids
 - Non-uniform cell sizes (within reason)
+- Double-detected grid lines (bimodal distribution refinement)
+- Over-detection correction (cross-validation between dimensions)
+
+**Verified Test Cases**:
+- 17×12 grid (non-square): Successfully detected with cross-validation
+- Handles grids where peak detection initially finds 35 columns → refined to 17
+- Handles grids where peak detection initially finds 24-25 rows → refined to 12
 
 However, it requires at least 2 detected lines per axis. If detection fails, try:
 - Improving image contrast

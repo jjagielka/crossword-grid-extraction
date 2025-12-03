@@ -34,18 +34,23 @@ def extract_crossword_grid(
     image_base64: str,
     output_format: str = "csv",
     intensity_threshold: Optional[int] = None,
+    detect_dots: bool = True,
 ) -> str:
-    """Extract a crossword grid from an image and convert it to a binary matrix.
+    """Extract a crossword grid from an image and convert it to a matrix.
 
     This tool performs the full pipeline:
     1. Extracts and straightens the crossword grid from the image
     2. Detects the grid dimensions (rows × columns)
-    3. Converts the grid to a binary matrix (0=black cell, 1=white cell)
+    3. Converts the grid to a matrix with values:
+       - 0 = black cell (filled)
+       - 1 = white cell (empty)
+       - 2 = white cell with black dot (solution letter location)
 
     Args:
         image_base64: Base64-encoded image data (JPEG, PNG, etc.)
         output_format: Output format - "csv" for comma-separated values, "array" for numpy array string, or "json" for JSON array
         intensity_threshold: Optional manual threshold for black/white classification (auto-detected using Otsu's method if not provided)
+        detect_dots: Whether to detect black dots in white cells marking solution letters (default: True)
 
     Returns:
         String containing the grid matrix in the requested format, along with metadata about dimensions and statistics
@@ -109,8 +114,8 @@ def extract_crossword_grid(
             cols, rows = detect_grid_dimensions(warped)
             logger.info(f"Detected: {cols} columns × {rows} rows")
 
-            # Step 3: Convert to binary matrix
-            logger.info("Step 3/3: Converting to binary matrix...")
+            # Step 3: Convert to matrix
+            logger.info("Step 3/3: Converting to matrix...")
             grid_matrix = convert_to_matrix(
                 warped,
                 max_width,
@@ -118,14 +123,19 @@ def extract_crossword_grid(
                 rows,
                 cols,
                 intensity_threshold=intensity_threshold,
+                detect_dots=detect_dots,
             )
 
             # Format output
             white_cells = int(np.sum(grid_matrix == 1))
             black_cells = int(np.sum(grid_matrix == 0))
+            dotted_cells = int(np.sum(grid_matrix == 2))
 
             header = f"Detected: {cols} columns × {rows} rows\n"
-            header += f"Grid statistics: {white_cells} white cells, {black_cells} black cells\n\n"
+            if detect_dots and dotted_cells > 0:
+                header += f"Grid statistics: {white_cells} white cells, {black_cells} black cells, {dotted_cells} cells with dots\n\n"
+            else:
+                header += f"Grid statistics: {white_cells} white cells, {black_cells} black cells\n\n"
 
             if output_format == "csv":
                 # CSV format

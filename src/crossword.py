@@ -113,8 +113,14 @@ def cmd_convert(args: argparse.Namespace) -> None:
     cols, rows = detect_grid_dimensions(warped)
     logger.info(f"Detected: {cols} columns x {rows} rows")
 
-    # Step 3: Convert to binary matrix
-    logger.info("Step 3/3: Converting to binary matrix...")
+    # Step 3: Convert to matrix
+    step_msg = "Step 3/3: Converting to matrix"
+    if args.detect_dots:
+        step_msg += " (with dot detection)..."
+    else:
+        step_msg += "..."
+    logger.info(step_msg)
+
     grid_matrix = convert_to_matrix(
         warped,
         max_width,
@@ -122,13 +128,17 @@ def cmd_convert(args: argparse.Namespace) -> None:
         rows,
         cols,
         intensity_threshold=args.threshold,
+        detect_dots=args.detect_dots,
     )
 
     # Save to CSV
     save_matrix_to_csv(grid_matrix, args.output)
 
     # Print matrix to console
-    logger.info("\nGrid Matrix (0=Black, 1=White):")
+    if args.detect_dots:
+        logger.info("\nGrid Matrix (0=Black, 1=White, 2=White+Dot):")
+    else:
+        logger.info("\nGrid Matrix (0=Black, 1=White):")
     print(grid_matrix)
 
     logger.info(f"\n✓ Conversion complete! Output saved to: {args.output}")
@@ -237,6 +247,18 @@ Examples:
         "-t", "--threshold",
         type=int,
         help="Manual intensity threshold for black/white classification (auto-detected if not specified)",
+    )
+    convert_parser.add_argument(
+        "--detect-dots",
+        action="store_true",
+        default=True,
+        help="Detect black dots in white cells marking solution letters (default: enabled)",
+    )
+    convert_parser.add_argument(
+        "--no-detect-dots",
+        action="store_false",
+        dest="detect_dots",
+        help="Disable dot detection (output only 0=black, 1=white)",
     )
     convert_parser.add_argument(
         "--visualize",

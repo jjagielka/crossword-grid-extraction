@@ -37,8 +37,11 @@ warped, width, height = extract_grid(img)
 # Detect dimensions
 cols, rows = detect_grid_dimensions(warped)
 
-# Convert to binary matrix
+# Convert to matrix (with dot detection enabled by default)
 grid_matrix = convert_to_matrix(warped, width, height, rows, cols)
+
+# Or disable dot detection for binary output only
+grid_matrix = convert_to_matrix(warped, width, height, rows, cols, detect_dots=False)
 
 # Save to CSV (optional)
 from pathlib import Path
@@ -80,8 +83,8 @@ Detects the number of rows and columns in the grid.
 
 ---
 
-#### `convert_to_matrix(image, max_width, max_height, rows, cols, intensity_threshold=None, cell_margin=0.25)`
-Converts the straightened grid to a binary matrix.
+#### `convert_to_matrix(image, max_width, max_height, rows, cols, intensity_threshold=None, cell_margin=0.25, detect_dots=True, dot_size_ratio=0.15)`
+Converts the straightened grid to a matrix with optional dot detection.
 
 **Parameters:**
 - `image` (np.ndarray): Straightened grid image
@@ -91,12 +94,20 @@ Converts the straightened grid to a binary matrix.
 - `cols` (int): Number of columns
 - `intensity_threshold` (int, optional): Threshold for black/white classification (auto-detected if None)
 - `cell_margin` (float): Fraction of cell to crop from edges (0.0-0.5)
+- `detect_dots` (bool): Whether to detect black dots in white cells (default: True)
+- `dot_size_ratio` (float): Size of dot region in bottom-right corner (0.1-0.3, default: 0.15)
 
 **Returns:**
-- `np.ndarray`: Binary matrix where 0=black cell, 1=white cell
+- `np.ndarray`: Matrix where:
+  - 0 = black cell (filled)
+  - 1 = white cell (empty)
+  - 2 = white cell with black dot (solution letter marker)
 
 **Raises:**
 - `ValueError`: If dimensions are invalid
+
+**Note:**
+Black dots are detected in the bottom-right corner of white cells, commonly used to mark where solution letters are located in the crossword.
 
 ---
 

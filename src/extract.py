@@ -315,6 +315,65 @@ def detect_grid_dimensions(
     return estimated_cols, estimated_rows
 
 
+def _detect_dot_in_cell(
+    cell: np.ndarray,
+    dot_size_ratio: float,
+    intensity_threshold: float,
+) -> bool:
+    """Detect if a white cell contains a black dot in the bottom-right corner.
+
+    Args:
+        cell: Grayscale cell image
+        dot_size_ratio: Size of the corner region to check (0.1-0.3 of cell size)
+        intensity_threshold: Threshold for black/white classification
+
+    Returns:
+        True if a black dot is detected in the bottom-right corner
+
+    Note:
+        The dot is detected by checking if the bottom-right corner region
+        has significantly lower average intensity than the cell center.
+    """
+    cell_h, cell_w = cell.shape
+
+    # Define the bottom-right corner region where the dot should be
+    dot_region_h = int(cell_h * dot_size_ratio)
+    dot_region_w = int(cell_w * dot_size_ratio)
+
+    if dot_region_h < 3 or dot_region_w < 3:
+        # Cell too small for reliable dot detection
+        return False
+
+    # Extract bottom-right corner (avoiding the very edge to skip grid lines)
+    edge_margin = max(2, int(min(cell_h, cell_w) * 0.1))
+    br_corner = cell[
+        cell_h - dot_region_h - edge_margin : cell_h - edge_margin,
+        cell_w - dot_region_w - edge_margin : cell_w - edge_margin,
+    ]
+
+    if br_corner.size == 0:
+        return False
+
+    # Calculate average intensity in the corner
+    corner_intensity = np.mean(br_corner)
+
+    # Calculate center intensity of the cell for comparison
+    cell_h, cell_w = cell.shape
+    margin_y = int(cell_h * 0.25)
+    margin_x = int(cell_w * 0.25)
+    center = cell[margin_y : cell_h - margin_y, margin_x : cell_w - margin_x]
+    center_intensity = np.mean(center)
+
+    # A dot is present if the corner is noticeably darker than the cell center
+    # Use relative comparison: corner should be darker than center
+    # Real dots show at least 11-12% difference in intensity
+    # False positives show only ~10% difference from natural variation
+    # Use 89% threshold (11% difference) as the decision boundary
+    relative_threshold = center_intensity * 0.89  # Corner should be <89% of center brightness
+
+    return corner_intensity < relative_threshold
+
+
 def convert_to_matrix(
     image: np.ndarray,
     max_width: int,
@@ -323,8 +382,10 @@ def convert_to_matrix(
     cols: int,
     intensity_threshold: Optional[int] = None,
     cell_margin: float = 0.25,
+    detect_dots: bool = True,
+    dot_size_ratio: float = 0.20,
 ) -> np.ndarray:
-    """Convert straightened grid image to binary matrix.
+    """Convert straightened grid image to matrix with optional dot detection.
 
     Args:
         image: Straightened grid image (BGR format)
@@ -334,9 +395,14 @@ def convert_to_matrix(
         cols: Number of columns in the crossword grid
         intensity_threshold: Threshold for black/white classification (auto-detected if None)
         cell_margin: Fraction of cell to crop from edges (0.0-0.5)
+        detect_dots: Whether to detect black dots in white cells (solution markers)
+        dot_size_ratio: Size of dot region to check in bottom-right corner (0.1-0.3)
 
     Returns:
-        Binary matrix where 0=black cell, 1=white cell
+        Matrix where:
+        - 0 = black cell (filled)
+        - 1 = white cell (empty)
+        - 2 = white cell with black dot (solution letter location)
 
     Raises:
         ValueError: If rows or cols is less than 1
@@ -344,6 +410,7 @@ def convert_to_matrix(
     Note:
         Uses center sampling with configurable margins to avoid grid line contamination.
         Auto-threshold uses Otsu's method if not specified.
+        Black dots are detected in the bottom-right corner of white cells.
     """
     if rows < 1 or cols < 1:
         raise ValueError(f"Invalid grid dimensions: {rows}x{cols}. Must be at least 1x1.")
@@ -366,6 +433,7 @@ def convert_to_matrix(
         logger.debug(f"Using manual intensity threshold: {intensity_threshold}")
 
     # Process each cell
+    dot_count = 0
     for r in range(rows):
         for c in range(cols):
             y1 = int(r * cell_height)
@@ -383,13 +451,31 @@ def convert_to_matrix(
             avg_intensity = np.mean(center)
 
             # Classification: High intensity = White cell, Low intensity = Black cell
-            grid_matrix[r, c] = 1 if avg_intensity > intensity_threshold else 0
+            if avg_intensity > intensity_threshold:
+                # White cell - check for dot in bottom right corner
+                if detect_dots:
+                    has_dot = _detect_dot_in_cell(cell, dot_size_ratio, intensity_threshold)
+                    grid_matrix[r, c] = 2 if has_dot else 1
+                    if has_dot:
+                        dot_count += 1
+                else:
+                    grid_matrix[r, c] = 1
+            else:
+                # Black cell
+                grid_matrix[r, c] = 0
 
     # Output result
-    logger.info(f"Extracted {rows}x{cols} grid matrix (0=Black, 1=White)")
-    logger.info(
-        f"Grid statistics: {np.sum(grid_matrix == 1)} white cells, {np.sum(grid_matrix == 0)} black cells"
-    )
+    if detect_dots:
+        logger.info(f"Extracted {rows}x{cols} grid matrix (0=Black, 1=White, 2=White+Dot)")
+        logger.info(
+            f"Grid statistics: {np.sum(grid_matrix == 1)} white cells, "
+            f"{np.sum(grid_matrix == 0)} black cells, {dot_count} cells with dots"
+        )
+    else:
+        logger.info(f"Extracted {rows}x{cols} grid matrix (0=Black, 1=White)")
+        logger.info(
+            f"Grid statistics: {np.sum(grid_matrix == 1)} white cells, {np.sum(grid_matrix == 0)} black cells"
+        )
 
     return grid_matrix
 
