@@ -27,6 +27,22 @@ pip install -e .
 
 ## Usage
 
+### GUI Visualizer (Recommended for Development)
+
+A graphical interface for visualizing detection steps and tuning parameters:
+
+```bash
+# Launch the visualizer
+python src/visualizer.py
+
+# Or with a specific image
+python src/visualizer.py test_data/wciska_kig.jpg
+```
+
+See [docs/VISUALIZER.md](docs/VISUALIZER.md) for complete GUI documentation.
+
+**Requirements**: GTK3 and PyGObject (install with `uv pip install -e ".[gui]"`)
+
 ### Basic Commands
 
 ```bash
@@ -118,7 +134,9 @@ crossword-grid-extraction/
 ├── src/                  # Source code
 │   ├── extract.py        # Core CV library (shared)
 │   ├── crossword.py      # CLI interface (argparse)
-│   └── mcp_server.py     # MCP server interface
+│   ├── mcp_server.py     # MCP server interface
+│   ├── visualizer.py     # GTK3 GUI application
+│   └── visualizer.glade  # GUI layout definition
 │
 ├── docs/                 # Documentation
 │   ├── MCP_SERVER.md                    # MCP server setup and usage

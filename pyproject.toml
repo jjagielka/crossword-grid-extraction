@@ -32,6 +32,9 @@ dev = [
 mcp = [
     "fastmcp>=2.0.0",
 ]
+gui = [
+    "PyGObject>=3.42.0",
+]
 
 [tool.ruff]
 line-length = 100
