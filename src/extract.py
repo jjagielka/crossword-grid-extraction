@@ -410,6 +410,8 @@ def convert_to_matrix(
         raise ValueError(f"Invalid grid dimensions: {rows}x{cols}. Must be at least 1x1.")
 
     # Convert to grayscale
+    # Standard BGR2GRAY uses perceptually-weighted conversion: 0.299*R + 0.587*G + 0.114*B
+    # This works well for typical crossword images (black ink on white/cream paper)
     warped_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     grid_matrix = np.zeros((rows, cols), dtype=int)
 
@@ -417,13 +419,50 @@ def convert_to_matrix(
     cell_height = max_height / rows
     cell_width = max_width / cols
 
-    # Auto-detect threshold if not provided
+    # Determine if we should use local adaptive thresholding
+    # Check for lighting gradient by comparing corner intensities
+    use_local_threshold = False
+    global_threshold = None
+
     if intensity_threshold is None:
-        # Use Otsu's method on the entire image to find optimal threshold
-        _, binary = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        intensity_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
-        logger.debug(f"Auto-detected intensity threshold: {intensity_threshold:.1f}")
+        # Sample corners to detect lighting gradient
+        corner_size = min(max_height // 4, max_width // 4)
+        tl_corner = warped_gray[0:corner_size, 0:corner_size]
+        br_corner = warped_gray[max_height-corner_size:max_height, max_width-corner_size:max_width]
+
+        tl_mean = np.mean(tl_corner)
+        br_mean = np.mean(br_corner)
+        gradient_diff = abs(tl_mean - br_mean)
+
+        # If corners differ by more than 30, we have significant lighting gradient
+        # Apply CLAHE only if there are actual shadows (dark regions with intensity < 160)
+        if gradient_diff > 30:
+            min_corner = min(tl_mean, br_mean)
+            logger.debug(f"Detected lighting gradient: TL={tl_mean:.1f}, BR={br_mean:.1f}, diff={gradient_diff:.1f}")
+
+            # Only apply CLAHE if there are actual shadows (darkest corner < 160)
+            if min_corner < 160:
+                logger.debug(f"Applying CLAHE preprocessing to improve contrast in shadowed regions (min={min_corner:.1f})")
+
+                # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+                # This improves local contrast while avoiding over-amplification
+                clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+                warped_gray = clahe.apply(warped_gray)
+
+                # After CLAHE, we can use global threshold (local contrast is improved)
+                global_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
+                logger.debug(f"Auto-detected threshold after CLAHE: {global_threshold:.1f}")
+            else:
+                # Gradient but no shadows - just normal lighting variation
+                logger.debug(f"Gradient present but no shadows (min={min_corner:.1f}), using global threshold")
+                global_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
+                logger.debug(f"Auto-detected global threshold: {global_threshold:.1f}")
+        else:
+            # Use global Otsu's method
+            global_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
+            logger.debug(f"Auto-detected global threshold: {global_threshold:.1f}")
     else:
+        global_threshold = intensity_threshold
         logger.debug(f"Using manual intensity threshold: {intensity_threshold}")
 
     # Process each cell
@@ -445,7 +484,8 @@ def convert_to_matrix(
             avg_intensity = np.mean(center)
 
             # Classification: High intensity = White cell, Low intensity = Black cell
-            if avg_intensity > intensity_threshold:
+            # After CLAHE preprocessing (if applied), we use a single global threshold
+            if avg_intensity > global_threshold:
                 # White cell - check for dot in bottom right corner
                 if detect_dots:
                     has_dot = _detect_dot_in_cell(cell, dot_size_ratio, intensity_threshold)
