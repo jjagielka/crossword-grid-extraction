@@ -112,8 +112,8 @@ Grid statistics: 141 white cells, 53 black cells, 10 cells with dots
 ```
 crossword-grid-extraction/
 ├── README.md             # This file
-├── CLAUDE.md             # Development guide
-├── pyproject.toml        # Project configuration
+├── CLAUDE.md             # Development guide for Claude Code
+├── pyproject.toml        # Project configuration and dependencies
 │
 ├── src/                  # Source code
 │   ├── extract.py        # Core CV library (shared)
@@ -121,16 +121,35 @@ crossword-grid-extraction/
 │   └── mcp_server.py     # MCP server interface
 │
 ├── docs/                 # Documentation
-│   ├── MCP_SERVER.md
-│   ├── LIBRARY_USAGE.md
-│   ├── DOT_DETECTION_FEATURE.md
+│   ├── MCP_SERVER.md                    # MCP server setup and usage
+│   ├── LIBRARY_USAGE.md                 # Library API documentation
+│   ├── DOT_DETECTION_FEATURE.md         # Dot detection feature guide
+│   ├── SHADOW_HANDLING.md               # Shadow/lighting handling
+│   ├── ASPECT_RATIO_VALIDATION.md       # Validation approach
+│   └── ...
+│
+├── examples/             # Usage examples
+│   ├── example_usage.py  # Programmatic library usage
+│   └── ...
+│
+├── test_data/            # Test images for validation
+│   ├── wciska_kig.jpg    # Normal lighting (17×12)
+│   ├── zcieniem.jpg      # With shadows (17×12)
+│   ├── crosswords2.jpg   # Different grid (17×12)
+│   ├── jolka.jpg         # Portrait format (11×19)
+│   └── ...
+│
+├── dev/                  # Development files (debug/test scripts)
+│   ├── README.md         # Dev folder documentation
+│   ├── debug_*.py        # Diagnostic scripts
+│   ├── test_*.py         # Test scripts
 │   └── ...
 │
 ├── output/               # Generated output files (gitignored)
 │   ├── extracted_grid.jpg
 │   └── crossword_grid.csv
 │
-└── tests/                # Test suite (when available)
+└── tests/                # Formal test suite
 ```
 
 ## Requirements
@@ -159,17 +178,23 @@ This project includes an MCP (Model Context Protocol) server for integration wit
 # Install MCP dependencies
 uv pip install fastmcp
 
-# Run the MCP server
+# Run the MCP server (STDIO mode for Claude Desktop)
 python src/mcp_server.py
+
+# Run as HTTP service (for persistent deployment)
+python src/mcp_server.py --http
 
 # Test the MCP server
 python tests/test_mcp_server.py
 ```
 
-See [docs/MCP_SERVER.md](docs/MCP_SERVER.md) for detailed documentation on:
-- Configuring the server with Claude Desktop or other MCP clients
-- Available tools (extract_crossword_grid, get_grid_info)
-- Usage examples and API reference
+**Documentation:**
+- **[docs/MCP_SERVER.md](docs/MCP_SERVER.md)** - Complete MCP server guide
+  - Available tools (extract_crossword_grid, get_grid_info)
+  - Configuration for Claude Desktop and other MCP clients
+  - Usage examples, API reference, and troubleshooting
+- **[docs/DEPLOYMENT_OPTIONS.md](docs/DEPLOYMENT_OPTIONS.md)** - Choosing between STDIO and HTTP/SSE modes
+- **[docs/SYSTEMD_DEPLOYMENT.md](docs/SYSTEMD_DEPLOYMENT.md)** - Running as a systemd service on Linux
 
 ## Development
 

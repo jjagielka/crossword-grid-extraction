@@ -5,12 +5,16 @@ This folder contains test images and expected results for the test suite.
 ## Test Images
 
 - **nyt1.png** - First NYT crossword test image (15×15 grid)
-- **nyt2.jpg** - Second NYT crossword test image (20×21 grid)
+- **nyt2.jpg** - Second NYT crossword test image (21×21 grid, but currently detected as 20×21 due to perspective distortion from angled photo)
+- **wciska_kig.jpg** - Test image with normal lighting (17×12 grid, 10 dots)
+- **zcieniem.jpg** - Test image with shadows (17×12 grid, 10 dots)
+- **crosswords2.jpg** - Different crossword (17×12 grid, 7 dots)
+- **jolka.jpg** - Portrait format crossword (11×19 grid, 6 dots)
 
 ## Expected Results
 
 - **nyt1_result.txt** - Expected binary matrix for nyt1.png (15×15)
-- **nyt2_result.txt** - Expected binary matrix for nyt2.jpg (20×21)
+- **nyt2_result.txt** - Expected binary matrix for nyt2.jpg (21×21 ground truth, but may contain detection errors)
 
 ## Format
 

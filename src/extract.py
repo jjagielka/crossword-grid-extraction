@@ -219,7 +219,8 @@ def detect_grid_dimensions(
                 # Use 20% threshold to detect bimodal distribution
                 if max_gap > median_col_width * 0.2:
                     larger_spacings = sorted_diffs[max_gap_idx + 1:]
-                    if len(larger_spacings) >= 3:
+                    # Require at least 2 larger spacings (relaxed from 3 for smaller grids)
+                    if len(larger_spacings) >= 2:
                         refined_min_distance = int(np.median(larger_spacings) * 0.85)
                         peaks_cols_refined, _ = find_peaks(neg_col_proj, distance=refined_min_distance, prominence=col_prominence)
                         if len(peaks_cols_refined) > 1:
@@ -246,7 +247,8 @@ def detect_grid_dimensions(
                 max_gap = spacing_gaps[max_gap_idx]
                 if max_gap > median_row_height * 0.2:
                     larger_spacings = sorted_diffs[max_gap_idx + 1:]
-                    if len(larger_spacings) >= 3:
+                    # Require at least 2 larger spacings (relaxed from 3 for smaller grids)
+                    if len(larger_spacings) >= 2:
                         refined_min_distance = int(np.median(larger_spacings) * 0.85)
                         peaks_rows_refined, _ = find_peaks(neg_row_proj, distance=refined_min_distance, prominence=row_prominence)
                         if len(peaks_rows_refined) > 1:
@@ -289,6 +291,28 @@ def detect_grid_dimensions(
     if median_col_width > 0 and median_row_height > 0:
         logger.debug(f"Median Cell Size: {median_col_width:.2f}px x {median_row_height:.2f}px")
         logger.debug(f"Calculated Grid Dimensions: {estimated_cols} cols x {estimated_rows} rows")
+
+        # Aspect ratio validation: crossword cells are typically square
+        # Check if image ratio matches grid ratio and cell aspect ratio
+        image_ratio = width / height
+        grid_ratio = estimated_cols / estimated_rows
+        cell_aspect = median_col_width / median_row_height
+
+        ratio_error = abs(image_ratio - grid_ratio) / image_ratio * 100
+        cell_squareness_error = abs(cell_aspect - 1.0) * 100
+
+        logger.debug(f"Aspect Ratio Check:")
+        logger.debug(f"  Image ratio: {image_ratio:.3f}, Grid ratio: {grid_ratio:.3f}, Error: {ratio_error:.1f}%")
+        logger.debug(f"  Cell aspect: {cell_aspect:.3f} (1.0 = square), Error: {cell_squareness_error:.1f}%")
+
+        # Warning if ratios don't match (possible detection error)
+        if ratio_error > 10:
+            logger.warning(f"Image ratio ({image_ratio:.3f}) differs significantly from grid ratio ({grid_ratio:.3f})")
+            logger.warning(f"This may indicate incorrect dimension detection. Expected ratio error < 10%, got {ratio_error:.1f}%")
+
+        if cell_squareness_error > 15:
+            logger.warning(f"Cells are not square (aspect={cell_aspect:.3f}, expected ~1.0)")
+            logger.warning(f"This may indicate incorrect dimension detection or non-standard crossword format")
 
     # Validate detected dimensions
     if estimated_rows < 1 or estimated_cols < 1:
