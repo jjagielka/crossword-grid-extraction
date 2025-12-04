@@ -4,8 +4,8 @@ This folder contains test images and expected results for the test suite.
 
 ## Test Images
 
-- **nyt1.png** - First NYT crossword test image (15×15 grid)
-- **nyt2.jpg** - Second NYT crossword test image (21×21 grid, but currently detected as 20×21 due to perspective distortion from angled photo)
+- **nyt1.png** - First NYT crossword test image (15×15 grid, no dots)
+- **nyt2.jpg** - Second NYT crossword test image (21×21 grid, no dots, but currently detected as 20×21 due to perspective distortion from angled photo. Very small cells ~19×15px with cell numbers.)
 - **wciska_kig.jpg** - Test image with normal lighting (17×12 grid, 10 dots)
 - **zcieniem.jpg** - Test image with shadows (17×12 grid, 10 dots)
 - **crosswords2.jpg** - Different crossword (17×12 grid, 7 dots)

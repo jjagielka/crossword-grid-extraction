@@ -351,15 +351,24 @@ def _detect_dot_in_cell(
     Note:
         The dot is detected by checking if the bottom-right corner region
         has significantly lower average intensity than the cell center.
+
+        Requires minimum cell size of 30x30 pixels to avoid false positives
+        from cell numbers, artifacts, or noise in small cells.
     """
     cell_h, cell_w = cell.shape
+
+    # Require minimum absolute cell size for reliable dot detection
+    # Small cells (<30px) can have cell numbers that create false positives
+    MIN_CELL_SIZE = 30
+    if cell_h < MIN_CELL_SIZE or cell_w < MIN_CELL_SIZE:
+        return False
 
     # Define the bottom-right corner region where the dot should be
     dot_region_h = int(cell_h * dot_size_ratio)
     dot_region_w = int(cell_w * dot_size_ratio)
 
     if dot_region_h < 3 or dot_region_w < 3:
-        # Cell too small for reliable dot detection
+        # Dot region too small for reliable detection
         return False
 
     # Extract bottom-right corner (avoiding the very edge to skip grid lines)
