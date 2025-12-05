@@ -226,6 +226,10 @@ class CrosswordVisualizer:
         """Handle window close."""
         Gtk.main_quit()
 
+    def on_quit_activate(self, widget=None):
+        """Handle quit action."""
+        Gtk.main_quit()
+
     def on_open_clicked(self, button):
         """Handle Open Image button click."""
         dialog = Gtk.FileChooserDialog(

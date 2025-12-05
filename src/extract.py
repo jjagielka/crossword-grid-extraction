@@ -14,6 +14,7 @@ from typing import Optional
 import cv2
 import numpy as np
 from scipy.signal import find_peaks
+from scipy.interpolate import UnivariateSpline
 from loguru import logger
 
 
@@ -333,6 +334,162 @@ def detect_grid_dimensions(
     return estimated_cols, estimated_rows
 
 
+def detect_curved_grid_lines(
+    img: np.ndarray,
+    rows: int,
+    cols: int,
+    smoothing_factor: float = 100.0
+) -> tuple[list[UnivariateSpline], list[UnivariateSpline]]:
+    """Detect actual curved grid lines using edge detection and spline fitting.
+
+    This function traces the actual grid lines in the image and fits smooth curves
+    to them, allowing for detection of warped/curved grids that deviate from
+    perfect straight lines.
+
+    Args:
+        img: Input image (BGR or grayscale)
+        rows: Number of rows in the grid
+        cols: Number of columns in the grid
+        smoothing_factor: Smoothing parameter for spline fitting (higher = smoother)
+
+    Returns:
+        Tuple of (horizontal_splines, vertical_splines) where each is a list of
+        UnivariateSpline objects representing the grid lines
+
+    Note:
+        - Horizontal splines are functions y=f(x) for horizontal grid lines
+        - Vertical splines are functions x=f(y) for vertical grid lines
+        - Returns rows+1 horizontal lines and cols+1 vertical lines
+    """
+    # Convert to grayscale if needed
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img
+
+    height, width = gray.shape
+
+    # Apply edge detection to find grid lines
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+
+    # Detect horizontal lines (for row boundaries)
+    horizontal_splines = []
+    expected_row_positions = np.linspace(0, height, rows + 1)
+
+    for row_idx, expected_y in enumerate(expected_row_positions):
+        # Define search window around expected position (±10% of cell height)
+        search_window = int(height / rows * 0.3)
+        y_min = max(0, int(expected_y - search_window))
+        y_max = min(height, int(expected_y + search_window))
+
+        # Extract horizontal strip
+        strip = edges[y_min:y_max, :]
+
+        # Find the strongest horizontal line in this strip
+        row_projection = np.sum(strip, axis=1)
+        if len(row_projection) > 0:
+            local_max_idx = np.argmax(row_projection)
+            actual_y = y_min + local_max_idx
+
+            # Trace this horizontal line across the width
+            x_coords = []
+            y_coords = []
+
+            # Sample points along the width
+            num_samples = min(50, width // 10)  # Sample every ~10 pixels
+            for x in np.linspace(0, width-1, num_samples, dtype=int):
+                # Look for edge in vertical neighborhood
+                search_height = min(15, height // (rows * 2))
+                y_search_min = max(0, actual_y - search_height)
+                y_search_max = min(height, actual_y + search_height)
+
+                # Find strongest edge in this vertical slice
+                local_strip = edges[y_search_min:y_search_max, x]
+                if np.any(local_strip):
+                    local_edges = np.where(local_strip > 0)[0]
+                    if len(local_edges) > 0:
+                        # Use median to be robust to outliers
+                        local_y = y_search_min + int(np.median(local_edges))
+                        x_coords.append(x)
+                        y_coords.append(local_y)
+
+            # Fit spline if we have enough points
+            if len(x_coords) >= 4:
+                try:
+                    # Fit spline: y = f(x)
+                    spline = UnivariateSpline(x_coords, y_coords, s=smoothing_factor, k=3)
+                    horizontal_splines.append(spline)
+                except:
+                    # Fallback to straight line
+                    horizontal_splines.append(lambda x, y=actual_y: np.full_like(x, y, dtype=float))
+            else:
+                # Not enough points, use straight line
+                horizontal_splines.append(lambda x, y=actual_y: np.full_like(x, y, dtype=float))
+        else:
+            # No edges found, use expected position
+            horizontal_splines.append(lambda x, y=expected_y: np.full_like(x, y, dtype=float))
+
+    # Detect vertical lines (for column boundaries)
+    vertical_splines = []
+    expected_col_positions = np.linspace(0, width, cols + 1)
+
+    for col_idx, expected_x in enumerate(expected_col_positions):
+        # Define search window
+        search_window = int(width / cols * 0.3)
+        x_min = max(0, int(expected_x - search_window))
+        x_max = min(width, int(expected_x + search_window))
+
+        # Extract vertical strip
+        strip = edges[:, x_min:x_max]
+
+        # Find the strongest vertical line in this strip
+        col_projection = np.sum(strip, axis=0)
+        if len(col_projection) > 0:
+            local_max_idx = np.argmax(col_projection)
+            actual_x = x_min + local_max_idx
+
+            # Trace this vertical line across the height
+            y_coords = []
+            x_coords = []
+
+            # Sample points along the height
+            num_samples = min(50, height // 10)
+            for y in np.linspace(0, height-1, num_samples, dtype=int):
+                # Look for edge in horizontal neighborhood
+                search_width = min(15, width // (cols * 2))
+                x_search_min = max(0, actual_x - search_width)
+                x_search_max = min(width, actual_x + search_width)
+
+                # Find strongest edge in this horizontal slice
+                local_strip = edges[y, x_search_min:x_search_max]
+                if np.any(local_strip):
+                    local_edges = np.where(local_strip > 0)[0]
+                    if len(local_edges) > 0:
+                        local_x = x_search_min + int(np.median(local_edges))
+                        y_coords.append(y)
+                        x_coords.append(local_x)
+
+            # Fit spline if we have enough points
+            if len(y_coords) >= 4:
+                try:
+                    # Fit spline: x = f(y)
+                    spline = UnivariateSpline(y_coords, x_coords, s=smoothing_factor, k=3)
+                    vertical_splines.append(spline)
+                except:
+                    # Fallback to straight line
+                    vertical_splines.append(lambda y, x=actual_x: np.full_like(y, x, dtype=float))
+            else:
+                # Not enough points, use straight line
+                vertical_splines.append(lambda y, x=actual_x: np.full_like(y, x, dtype=float))
+        else:
+            # No edges found, use expected position
+            vertical_splines.append(lambda y, x=expected_x: np.full_like(y, x, dtype=float))
+
+    logger.debug(f"Detected {len(horizontal_splines)} horizontal and {len(vertical_splines)} vertical curved grid lines")
+
+    return horizontal_splines, vertical_splines
+
+
 def _detect_dot_in_cell(
     cell: np.ndarray,
     dot_size_ratio: float,
@@ -411,6 +568,8 @@ def convert_to_matrix(
     cell_margin: float = 0.25,
     detect_dots: bool = True,
     dot_size_ratio: float = 0.20,
+    use_curved_lines: bool = True,
+    curve_smoothing: float = 100.0,
 ) -> np.ndarray:
     """Convert straightened grid image to matrix with optional dot detection.
 
@@ -424,6 +583,8 @@ def convert_to_matrix(
         cell_margin: Fraction of cell to crop from edges (0.0-0.5)
         detect_dots: Whether to detect black dots in white cells (solution markers)
         dot_size_ratio: Size of dot region to check in bottom-right corner (0.1-0.3)
+        use_curved_lines: Whether to use curved grid line detection (adapts to warped grids)
+        curve_smoothing: Smoothing factor for spline fitting (higher = smoother curves)
 
     Returns:
         Matrix where:
@@ -498,14 +659,58 @@ def convert_to_matrix(
         global_threshold = intensity_threshold
         logger.debug(f"Using manual intensity threshold: {intensity_threshold}")
 
+    # Detect curved grid lines if enabled
+    horizontal_splines = None
+    vertical_splines = None
+    if use_curved_lines:
+        try:
+            horizontal_splines, vertical_splines = detect_curved_grid_lines(
+                image, rows, cols, smoothing_factor=curve_smoothing
+            )
+            logger.debug("Using curved grid line detection for cell extraction")
+        except Exception as e:
+            logger.warning(f"Curved grid line detection failed: {e}. Falling back to straight lines.")
+            use_curved_lines = False
+
     # Process each cell
     dot_count = 0
     for r in range(rows):
         for c in range(cols):
-            y1 = int(r * cell_height)
-            y2 = int((r + 1) * cell_height)
-            x1 = int(c * cell_width)
-            x2 = int((c + 1) * cell_width)
+            if use_curved_lines and horizontal_splines and vertical_splines:
+                # Use curved grid lines to extract cell
+                # Get the four boundary curves for this cell
+                top_spline = horizontal_splines[r]
+                bottom_spline = horizontal_splines[r + 1]
+                left_spline = vertical_splines[c]
+                right_spline = vertical_splines[c + 1]
+
+                # Sample the curves to find bounding box
+                sample_x = np.linspace(0, max_width - 1, 20)
+                sample_y = np.linspace(0, max_height - 1, 20)
+
+                # Get approximate bounds
+                top_y = int(np.mean([top_spline(x) for x in sample_x]))
+                bottom_y = int(np.mean([bottom_spline(x) for x in sample_x]))
+                left_x = int(np.mean([left_spline(y) for y in sample_y]))
+                right_x = int(np.mean([right_spline(y) for y in sample_y]))
+
+                # Ensure valid bounds
+                y1 = max(0, min(top_y, max_height - 1))
+                y2 = max(0, min(bottom_y, max_height - 1))
+                x1 = max(0, min(left_x, max_width - 1))
+                x2 = max(0, min(right_x, max_width - 1))
+
+                # Ensure y2 > y1 and x2 > x1
+                if y2 <= y1:
+                    y2 = y1 + 1
+                if x2 <= x1:
+                    x2 = x1 + 1
+            else:
+                # Use straight line cell extraction (original method)
+                y1 = int(r * cell_height)
+                y2 = int((r + 1) * cell_height)
+                x1 = int(c * cell_width)
+                x2 = int((c + 1) * cell_width)
 
             # Extract cell and crop to center (to avoid grid lines)
             cell = warped_gray[y1:y2, x1:x2]

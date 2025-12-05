@@ -1,0 +1,433 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+
+  <!-- Application Menu with keyboard shortcuts -->
+  <menu id="app_menu">
+    <section>
+      <item>
+        <attribute name="label">Open Image</attribute>
+        <attribute name="action">app.open</attribute>
+        <attribute name="accel">&lt;Primary&gt;o</attribute>
+      </item>
+      <item>
+        <attribute name="label">Process Image</attribute>
+        <attribute name="action">app.process</attribute>
+        <attribute name="accel">&lt;Primary&gt;p</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label">Zoom In</attribute>
+        <attribute name="action">app.zoom-in</attribute>
+        <attribute name="accel">&lt;Primary&gt;plus</attribute>
+      </item>
+      <item>
+        <attribute name="label">Zoom Out</attribute>
+        <attribute name="action">app.zoom-out</attribute>
+        <attribute name="accel">&lt;Primary&gt;minus</attribute>
+      </item>
+      <item>
+        <attribute name="label">Zoom Fit</attribute>
+        <attribute name="action">app.zoom-fit</attribute>
+        <attribute name="accel">&lt;Primary&gt;f</attribute>
+      </item>
+      <item>
+        <attribute name="label">Zoom 100%</attribute>
+        <attribute name="action">app.zoom-100</attribute>
+        <attribute name="accel">&lt;Primary&gt;0</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label">Quit</attribute>
+        <attribute name="action">app.quit</attribute>
+        <attribute name="accel">&lt;Primary&gt;q</attribute>
+      </item>
+    </section>
+  </menu>
+
+  <!-- Main Content Box -->
+  <object class="GtkBox" id="main_content">
+    <property name="orientation">vertical</property>
+        <child>
+          <!-- Header Bar with toolbar buttons -->
+          <object class="GtkHeaderBar" id="header_bar">
+            <property name="show-title-buttons">true</property>
+            <child type="start">
+              <object class="GtkButton" id="btn_open">
+                <property name="icon-name">document-open-symbolic</property>
+                <property name="tooltip-text">Open crossword image (Ctrl+O)</property>
+                <property name="action-name">app.open</property>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkButton" id="btn_process">
+                <property name="icon-name">system-run-symbolic</property>
+                <property name="tooltip-text">Process the current image (Ctrl+P)</property>
+                <property name="action-name">app.process</property>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkSeparator">
+                <property name="orientation">vertical</property>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkButton" id="btn_zoom_in">
+                <property name="icon-name">zoom-in-symbolic</property>
+                <property name="tooltip-text">Zoom in 25% (Ctrl++)</property>
+                <property name="action-name">app.zoom-in</property>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkButton" id="btn_zoom_out">
+                <property name="icon-name">zoom-out-symbolic</property>
+                <property name="tooltip-text">Zoom out 25% (Ctrl+-)</property>
+                <property name="action-name">app.zoom-out</property>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkButton" id="btn_zoom_fit">
+                <property name="icon-name">zoom-fit-best-symbolic</property>
+                <property name="tooltip-text">Fit image to window (Ctrl+F)</property>
+                <property name="action-name">app.zoom-fit</property>
+              </object>
+            </child>
+            <child type="start">
+              <object class="GtkButton" id="btn_zoom_100">
+                <property name="label">100%</property>
+                <property name="tooltip-text">Reset to actual size (Ctrl+0)</property>
+                <property name="action-name">app.zoom-100</property>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <!-- Main Content -->
+          <object class="GtkPaned">
+            <property name="vexpand">true</property>
+            <property name="position">300</property>
+            <property name="shrink-start-child">false</property>
+            <property name="shrink-end-child">false</property>
+            <!-- Left Panel -->
+            <child>
+              <object class="GtkScrolledWindow">
+                <property name="hscrollbar-policy">never</property>
+                <child>
+                  <object class="GtkBox">
+                    <property name="orientation">vertical</property>
+                    <property name="spacing">10</property>
+                    <property name="margin-start">10</property>
+                    <property name="margin-end">10</property>
+                    <property name="margin-top">10</property>
+                    <property name="margin-bottom">10</property>
+                    <!-- Visualization Steps -->
+                    <child>
+                      <object class="GtkFrame">
+                        <property name="label">Visualization Steps</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">5</property>
+                            <property name="margin-start">10</property>
+                            <property name="margin-end">10</property>
+                            <property name="margin-top">10</property>
+                            <property name="margin-bottom">10</property>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_original">
+                                <property name="label">Original Image</property>
+                                <property name="active">true</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'original'</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_contours">
+                                <property name="label">Contour Detection</property>
+                                <property name="group">radio_original</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'contours'</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_extracted">
+                                <property name="label">Extracted Grid</property>
+                                <property name="group">radio_original</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'extracted'</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_lines">
+                                <property name="label">Grid Lines Detection</property>
+                                <property name="group">radio_original</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'lines'</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_curved_lines">
+                                <property name="label">Curved Grid Lines</property>
+                                <property name="group">radio_original</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'curved_lines'</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_cells">
+                                <property name="label">Cell Classification</property>
+                                <property name="group">radio_original</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'cells'</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkCheckButton" id="radio_dots">
+                                <property name="label">Dot Detection</property>
+                                <property name="group">radio_original</property>
+                                <property name="action-name">app.view</property>
+                                <property name="action-target">'dots'</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <!-- Parameters -->
+                    <child>
+                      <object class="GtkFrame">
+                        <property name="label">Parameters</property>
+                        <child>
+                          <object class="GtkBox">
+                            <property name="orientation">vertical</property>
+                            <property name="spacing">10</property>
+                            <property name="margin-start">10</property>
+                            <property name="margin-end">10</property>
+                            <property name="margin-top">10</property>
+                            <property name="margin-bottom">10</property>
+                            <!-- Intensity Threshold -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">5</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label">Intensity Threshold</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkScale" id="scale_threshold">
+                                    <property name="adjustment">
+                                      <object class="GtkAdjustment">
+                                        <property name="lower">50</property>
+                                        <property name="upper">250</property>
+                                        <property name="value">140</property>
+                                        <property name="step-increment">1</property>
+                                        <property name="page-increment">10</property>
+                                      </object>
+                                    </property>
+                                    <property name="draw-value">true</property>
+                                    <property name="value-pos">right</property>
+                                    <property name="digits">0</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <!-- Cell Margin -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">5</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label">Cell Margin (sampling)</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkScale" id="scale_cell_margin">
+                                    <property name="adjustment">
+                                      <object class="GtkAdjustment">
+                                        <property name="lower">0.10</property>
+                                        <property name="upper">0.49</property>
+                                        <property name="value">0.25</property>
+                                        <property name="step-increment">0.01</property>
+                                        <property name="page-increment">0.05</property>
+                                      </object>
+                                    </property>
+                                    <property name="draw-value">true</property>
+                                    <property name="value-pos">right</property>
+                                    <property name="digits">2</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <!-- Dot Size Ratio -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">5</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label">Dot Size Ratio</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkScale" id="scale_dot_ratio">
+                                    <property name="adjustment">
+                                      <object class="GtkAdjustment">
+                                        <property name="lower">0.10</property>
+                                        <property name="upper">0.40</property>
+                                        <property name="value">0.20</property>
+                                        <property name="step-increment">0.01</property>
+                                        <property name="page-increment">0.05</property>
+                                      </object>
+                                    </property>
+                                    <property name="draw-value">true</property>
+                                    <property name="value-pos">right</property>
+                                    <property name="digits">2</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <!-- Min Cell Size -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">5</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label">Min Cell Size (for dots)</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkScale" id="scale_min_cell_size">
+                                    <property name="adjustment">
+                                      <object class="GtkAdjustment">
+                                        <property name="lower">10</property>
+                                        <property name="upper">100</property>
+                                        <property name="value">30</property>
+                                        <property name="step-increment">1</property>
+                                        <property name="page-increment">5</property>
+                                      </object>
+                                    </property>
+                                    <property name="draw-value">true</property>
+                                    <property name="value-pos">right</property>
+                                    <property name="digits">0</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                            <!-- Detect Dots Checkbox -->
+                            <child>
+                              <object class="GtkCheckButton" id="check_detect_dots">
+                                <property name="label">Enable Dot Detection</property>
+                                <property name="active">true</property>
+                                <property name="action-name">app.detect-dots</property>
+                              </object>
+                            </child>
+                            <!-- Separator -->
+                            <child>
+                              <object class="GtkSeparator">
+                                <property name="margin-top">10</property>
+                                <property name="margin-bottom">10</property>
+                              </object>
+                            </child>
+                            <!-- Curved Lines Section Header -->
+                            <child>
+                              <object class="GtkLabel">
+                                <property name="label">Curved Grid Line Detection</property>
+                                <property name="xalign">0</property>
+                                <property name="margin-bottom">5</property>
+                                <style>
+                                  <class name="heading"/>
+                                </style>
+                              </object>
+                            </child>
+                            <!-- Use Curved Lines Checkbox -->
+                            <child>
+                              <object class="GtkCheckButton" id="check_use_curved_lines">
+                                <property name="label">Enable Curved Detection</property>
+                                <property name="active">true</property>
+                                <property name="action-name">app.use-curved-lines</property>
+                              </object>
+                            </child>
+                            <!-- Curve Smoothing Factor -->
+                            <child>
+                              <object class="GtkBox">
+                                <property name="orientation">vertical</property>
+                                <property name="spacing">5</property>
+                                <child>
+                                  <object class="GtkLabel">
+                                    <property name="label">Curve Smoothing Factor</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                </child>
+                                <child>
+                                  <object class="GtkScale" id="scale_curve_smoothing">
+                                    <property name="adjustment">
+                                      <object class="GtkAdjustment">
+                                        <property name="lower">10</property>
+                                        <property name="upper">500</property>
+                                        <property name="value">100</property>
+                                        <property name="step-increment">10</property>
+                                        <property name="page-increment">50</property>
+                                      </object>
+                                    </property>
+                                    <property name="draw-value">true</property>
+                                    <property name="value-pos">right</property>
+                                    <property name="digits">0</property>
+                                  </object>
+                                </child>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <!-- Info Panel -->
+                    <child>
+                      <object class="GtkFrame">
+                        <property name="label">Detection Info</property>
+                        <property name="vexpand">true</property>
+                        <child>
+                          <object class="GtkScrolledWindow">
+                            <property name="hscrollbar-policy">never</property>
+                            <property name="min-content-height">150</property>
+                            <child>
+                              <object class="GtkTextView" id="text_info">
+                                <property name="editable">false</property>
+                                <property name="wrap-mode">word</property>
+                                <property name="left-margin">5</property>
+                                <property name="right-margin">5</property>
+                                <property name="top-margin">5</property>
+                                <property name="bottom-margin">5</property>
+                                <property name="monospace">true</property>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <!-- Right Panel - Image Display -->
+            <child>
+              <object class="GtkScrolledWindow">
+                <child>
+                  <object class="GtkPicture" id="image_display">
+                    <property name="can-shrink">false</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+  </object>
+</interface>

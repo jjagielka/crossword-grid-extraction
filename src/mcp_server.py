@@ -35,6 +35,8 @@ def extract_crossword_grid(
     output_format: str = "csv",
     intensity_threshold: Optional[int] = None,
     detect_dots: bool = True,
+    use_curved_lines: bool = True,
+    curve_smoothing: float = 100.0,
 ) -> str:
     """Extract a crossword grid from an image and convert it to a matrix.
 
@@ -51,6 +53,8 @@ def extract_crossword_grid(
         output_format: Output format - "csv" for comma-separated values, "array" for numpy array string, or "json" for JSON array
         intensity_threshold: Optional manual threshold for black/white classification (auto-detected using Otsu's method if not provided)
         detect_dots: Whether to detect black dots in white cells marking solution letters (default: True)
+        use_curved_lines: Use curved line detection for adaptive cell extraction (default: True)
+        curve_smoothing: Smoothing factor for curved line detection, range 10-500 (default: 100.0)
 
     Returns:
         String containing the grid matrix in the requested format, along with metadata about dimensions and statistics
@@ -124,6 +128,8 @@ def extract_crossword_grid(
                 cols,
                 intensity_threshold=intensity_threshold,
                 detect_dots=detect_dots,
+                use_curved_lines=use_curved_lines,
+                curve_smoothing=curve_smoothing,
             )
 
             # Format output

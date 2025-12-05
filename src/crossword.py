@@ -132,6 +132,8 @@ def cmd_convert(args: argparse.Namespace) -> None:
         cols,
         intensity_threshold=args.threshold,
         detect_dots=args.detect_dots,
+        use_curved_lines=args.use_curved_lines,
+        curve_smoothing=args.curve_smoothing,
     )
 
     # Save to CSV
@@ -190,6 +192,12 @@ Examples:
 
   # Use custom intensity threshold
   %(prog)s --input crossword.jpg convert --output grid.csv --threshold 150
+
+  # Adjust curve smoothing for warped grids
+  %(prog)s --input crossword.jpg convert --curve-smoothing 200
+
+  # Disable curved line detection (use straight lines only)
+  %(prog)s --input crossword.jpg convert --no-curved-lines
 
   # Enable verbose logging
   %(prog)s --input crossword.jpg --verbose convert --output grid.csv
@@ -267,6 +275,24 @@ Examples:
         "--visualize",
         action="store_true",
         help="Save intermediate visualization images",
+    )
+    convert_parser.add_argument(
+        "--use-curved-lines",
+        action="store_true",
+        default=True,
+        help="Use curved line detection for adaptive cell extraction (default: enabled)",
+    )
+    convert_parser.add_argument(
+        "--no-curved-lines",
+        action="store_false",
+        dest="use_curved_lines",
+        help="Disable curved detection, use straight lines only",
+    )
+    convert_parser.add_argument(
+        "--curve-smoothing",
+        type=float,
+        default=100.0,
+        help="Smoothing factor for curved line detection (10-500, default: 100)",
     )
 
     # Parse arguments

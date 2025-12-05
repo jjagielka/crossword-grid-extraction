@@ -32,16 +32,21 @@ pip install -e .
 A graphical interface for visualizing detection steps and tuning parameters:
 
 ```bash
-# Launch the visualizer
-python src/visualizer.py
+# Launch the GTK4 visualizer (recommended)
+./src/visualizer_gtk4.sh
 
 # Or with a specific image
+./src/visualizer_gtk4.sh test_data/wciska_kig.jpg
+
+# GTK3 version (legacy)
 python src/visualizer.py test_data/wciska_kig.jpg
 ```
 
 See [docs/VISUALIZER.md](docs/VISUALIZER.md) for complete GUI documentation.
 
-**Requirements**: GTK3 and PyGObject (install with `uv pip install -e ".[gui]"`)
+**Requirements**: GTK4 and PyGObject (install with `uv pip install -e ".[gui]"`)
+- GTK4: `sudo apt-get install gir1.2-gtk-4.0` (or see VISUALIZER.md for other platforms)
+- GTK3 version available if GTK4 is not installed
 
 ### Basic Commands
 
@@ -135,8 +140,11 @@ crossword-grid-extraction/
 │   ├── extract.py        # Core CV library (shared)
 │   ├── crossword.py      # CLI interface (argparse)
 │   ├── mcp_server.py     # MCP server interface
-│   ├── visualizer.py     # GTK3 GUI application
-│   └── visualizer.glade  # GUI layout definition
+│   ├── visualizer_gtk4.py   # GTK4 GUI application (recommended)
+│   ├── visualizer_gtk4.ui   # GTK4 UI definition
+│   ├── visualizer_gtk4.sh   # GTK4 launcher script
+│   ├── visualizer.py        # GTK3 GUI application (legacy)
+│   └── visualizer.glade     # GTK3 UI definition (legacy)
 │
 ├── docs/                 # Documentation
 │   ├── MCP_SERVER.md                    # MCP server setup and usage
