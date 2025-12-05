@@ -138,7 +138,10 @@ def extract_grid(
 
 
 def detect_grid_dimensions(
-    img: np.ndarray, min_distance_factor: int = 50, prominence_factor: int = 10
+    img: np.ndarray,
+    min_distance_factor: int = 50,
+    prominence_factor: int = 10,
+    expected_cell_aspect_ratio: float = 1.0,
 ) -> tuple[int, int]:
     """Detect grid dimensions using projection profile analysis.
 
@@ -146,6 +149,10 @@ def detect_grid_dimensions(
         img: Input image (BGR or grayscale)
         min_distance_factor: Divisor for minimum peak distance (image_size / factor)
         prominence_factor: Multiplier for peak prominence threshold (image_size * factor)
+        expected_cell_aspect_ratio: Expected width/height ratio of cells (default: 1.0 for square cells)
+            - 1.0 = square cells (typical for most crosswords)
+            - >1.0 = wider than tall cells
+            - <1.0 = taller than wide cells
 
     Returns:
         Tuple of (columns, rows) detected in the grid
@@ -158,6 +165,7 @@ def detect_grid_dimensions(
         Uses projection profiles and peak detection to find grid lines.
         Calculates median cell size for robustness against missing lines.
         Returns dimensions in (cols, rows) order to match standard convention.
+        The expected_cell_aspect_ratio helps validation and can guide detection for non-square grids.
     """
     if img is None:
         raise ValueError("Input image is None")
@@ -284,6 +292,37 @@ def detect_grid_dimensions(
                 median_col_width = median_col_width_cross
                 logger.debug(f"Cross-validated column detection: {len(peaks_cols)} peaks → {estimated_cols} columns")
 
+    # Use expected aspect ratio to refine detection if specified and detection seems off
+    if (median_col_width > 0 and median_row_height > 0 and
+        estimated_rows > 0 and estimated_cols > 0 and
+        expected_cell_aspect_ratio != 1.0):
+
+        cell_aspect = median_col_width / median_row_height
+        aspect_error = abs(cell_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio
+
+        # If detected aspect differs significantly from expected (>20%), try to refine
+        if aspect_error > 0.20:
+            logger.debug(f"Cell aspect {cell_aspect:.3f} differs from expected {expected_cell_aspect_ratio:.3f}, attempting refinement...")
+
+            # Calculate what the dimensions should be based on expected aspect ratio
+            # Keep the dimension with more detected peaks (more reliable)
+            if len(peaks_cols) >= len(peaks_rows):
+                # Trust columns, adjust rows based on expected aspect
+                expected_cell_height = median_col_width / expected_cell_aspect_ratio
+                estimated_rows_refined = round(height / expected_cell_height)
+                if 5 <= estimated_rows_refined <= 50:
+                    logger.debug(f"Refined rows from {estimated_rows} to {estimated_rows_refined} based on expected aspect ratio")
+                    estimated_rows = estimated_rows_refined
+                    median_row_height = height / estimated_rows
+            else:
+                # Trust rows, adjust columns based on expected aspect
+                expected_cell_width = median_row_height * expected_cell_aspect_ratio
+                estimated_cols_refined = round(width / expected_cell_width)
+                if 5 <= estimated_cols_refined <= 50:
+                    logger.debug(f"Refined cols from {estimated_cols} to {estimated_cols_refined} based on expected aspect ratio")
+                    estimated_cols = estimated_cols_refined
+                    median_col_width = width / estimated_cols
+
     logger.debug("--- Grid Dimension Analysis ---")
     logger.debug(f"Image Size: {width}x{height} pixels")
     logger.debug(f"Detected Vertical Grid Lines: {len(peaks_cols)}")
@@ -293,27 +332,27 @@ def detect_grid_dimensions(
         logger.debug(f"Median Cell Size: {median_col_width:.2f}px x {median_row_height:.2f}px")
         logger.debug(f"Calculated Grid Dimensions: {estimated_cols} cols x {estimated_rows} rows")
 
-        # Aspect ratio validation: crossword cells are typically square
+        # Aspect ratio validation using expected cell aspect ratio
         # Check if image ratio matches grid ratio and cell aspect ratio
         image_ratio = width / height
         grid_ratio = estimated_cols / estimated_rows
         cell_aspect = median_col_width / median_row_height
 
         ratio_error = abs(image_ratio - grid_ratio) / image_ratio * 100
-        cell_squareness_error = abs(cell_aspect - 1.0) * 100
+        cell_aspect_error = abs(cell_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio * 100
 
         logger.debug(f"Aspect Ratio Check:")
         logger.debug(f"  Image ratio: {image_ratio:.3f}, Grid ratio: {grid_ratio:.3f}, Error: {ratio_error:.1f}%")
-        logger.debug(f"  Cell aspect: {cell_aspect:.3f} (1.0 = square), Error: {cell_squareness_error:.1f}%")
+        logger.debug(f"  Cell aspect: {cell_aspect:.3f} (expected: {expected_cell_aspect_ratio:.3f}), Error: {cell_aspect_error:.1f}%")
 
         # Warning if ratios don't match (possible detection error)
         if ratio_error > 10:
             logger.warning(f"Image ratio ({image_ratio:.3f}) differs significantly from grid ratio ({grid_ratio:.3f})")
             logger.warning(f"This may indicate incorrect dimension detection. Expected ratio error < 10%, got {ratio_error:.1f}%")
 
-        if cell_squareness_error > 15:
-            logger.warning(f"Cells are not square (aspect={cell_aspect:.3f}, expected ~1.0)")
-            logger.warning(f"This may indicate incorrect dimension detection or non-standard crossword format")
+        if cell_aspect_error > 15:
+            logger.warning(f"Cells don't match expected aspect ratio (actual={cell_aspect:.3f}, expected={expected_cell_aspect_ratio:.3f})")
+            logger.warning(f"This may indicate incorrect dimension detection. Try adjusting expected_cell_aspect_ratio parameter")
 
     # Validate detected dimensions
     if estimated_rows < 1 or estimated_cols < 1:

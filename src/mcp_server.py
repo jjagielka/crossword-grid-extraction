@@ -37,6 +37,7 @@ def extract_crossword_grid(
     detect_dots: bool = True,
     use_curved_lines: bool = True,
     curve_smoothing: float = 100.0,
+    expected_cell_aspect_ratio: float = 1.0,
 ) -> str:
     """Extract a crossword grid from an image and convert it to a matrix.
 
@@ -55,6 +56,7 @@ def extract_crossword_grid(
         detect_dots: Whether to detect black dots in white cells marking solution letters (default: True)
         use_curved_lines: Use curved line detection for adaptive cell extraction (default: True)
         curve_smoothing: Smoothing factor for curved line detection, range 10-500 (default: 100.0)
+        expected_cell_aspect_ratio: Expected width/height ratio of cells (default: 1.0 for square cells, >1.0 for wider, <1.0 for taller)
 
     Returns:
         String containing the grid matrix in the requested format, along with metadata about dimensions and statistics
@@ -115,7 +117,7 @@ def extract_crossword_grid(
 
             # Step 2: Detect grid dimensions
             logger.info("Step 2/3: Detecting grid dimensions...")
-            cols, rows = detect_grid_dimensions(warped)
+            cols, rows = detect_grid_dimensions(warped, expected_cell_aspect_ratio=expected_cell_aspect_ratio)
             logger.info(f"Detected: {cols} columns × {rows} rows")
 
             # Step 3: Convert to matrix

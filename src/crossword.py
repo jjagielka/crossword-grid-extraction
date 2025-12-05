@@ -91,7 +91,8 @@ def cmd_size(args: argparse.Namespace) -> None:
     warped, max_width, max_height = extract_grid(image)
 
     # Detect dimensions on the warped/straightened grid
-    cols, rows = detect_grid_dimensions(warped)
+    cell_aspect_ratio = getattr(args, 'cell_aspect_ratio', 1.0)
+    cols, rows = detect_grid_dimensions(warped, expected_cell_aspect_ratio=cell_aspect_ratio)
     logger.info(f"Detected grid dimensions: {cols} columns x {rows} rows")
 
 
@@ -113,7 +114,7 @@ def cmd_convert(args: argparse.Namespace) -> None:
 
     # Step 2: Detect dimensions
     logger.info("Step 2/3: Detecting grid dimensions...")
-    cols, rows = detect_grid_dimensions(warped)
+    cols, rows = detect_grid_dimensions(warped, expected_cell_aspect_ratio=args.cell_aspect_ratio)
     logger.info(f"Detected: {cols} columns x {rows} rows")
 
     # Step 3: Convert to matrix
@@ -238,9 +239,15 @@ Examples:
     )
 
     # Size command
-    subparsers.add_parser(
+    size_parser = subparsers.add_parser(
         "size",
         help="Detect and display grid dimensions (columns x rows)",
+    )
+    size_parser.add_argument(
+        "--cell-aspect-ratio",
+        type=float,
+        default=1.0,
+        help="Expected cell width/height ratio (default: 1.0 for square cells, >1.0 for wider, <1.0 for taller)",
     )
 
     # Convert command
@@ -293,6 +300,12 @@ Examples:
         type=float,
         default=100.0,
         help="Smoothing factor for curved line detection (10-500, default: 100)",
+    )
+    convert_parser.add_argument(
+        "--cell-aspect-ratio",
+        type=float,
+        default=1.0,
+        help="Expected cell width/height ratio (default: 1.0 for square cells, >1.0 for wider, <1.0 for taller)",
     )
 
     # Parse arguments

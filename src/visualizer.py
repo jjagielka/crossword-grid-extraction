@@ -63,6 +63,7 @@ class CrosswordVisualizerApp(Gtk.Application):
             ("detect-dots", "b", True, self.on_parameter_change),
             ("use-curved-lines", "b", True, self.on_parameter_change),
             ("curve-smoothing", "d", 100.0, self.on_parameter_change),
+            ("cell-aspect-ratio", "d", 1.0, self.on_parameter_change),
         ]
 
         for name, vtype, default, callback in stateful:
@@ -153,6 +154,7 @@ class CrosswordVisualizerWindow(Gtk.ApplicationWindow):
         self.check_detect_dots = builder.get_object("check_detect_dots")
         self.check_use_curved_lines = builder.get_object("check_use_curved_lines")
         self.scale_curve_smoothing = builder.get_object("scale_curve_smoothing")
+        self.scale_cell_aspect_ratio = builder.get_object("scale_cell_aspect_ratio")
 
         # Get radio buttons
         self.radio_original = builder.get_object("radio_original")
@@ -170,6 +172,7 @@ class CrosswordVisualizerWindow(Gtk.ApplicationWindow):
         self.scale_dot_ratio.connect("value-changed", self.on_dot_ratio_changed)
         self.scale_min_cell_size.connect("value-changed", self.on_min_cell_changed)
         self.scale_curve_smoothing.connect("value-changed", self.on_curve_smoothing_changed)
+        self.scale_cell_aspect_ratio.connect("value-changed", self.on_cell_aspect_ratio_changed)
 
         # Note: Toolbar buttons, radio buttons, and checkboxes use action-name property
         # and are connected automatically via the GTK action system
@@ -345,7 +348,10 @@ class CrosswordVisualizerWindow(Gtk.ApplicationWindow):
             self.warped_image, width, height = extract_grid(self.original_image)
 
             # Step 2: Detect dimensions
-            self.detected_cols, self.detected_rows = detect_grid_dimensions(self.warped_image)
+            cell_aspect_ratio = self.scale_cell_aspect_ratio.get_value()
+            self.detected_cols, self.detected_rows = detect_grid_dimensions(
+                self.warped_image, expected_cell_aspect_ratio=cell_aspect_ratio
+            )
             self.vis_lines = self.visualize_grid_lines(
                 self.warped_image, self.detected_cols, self.detected_rows
             )
@@ -611,6 +617,13 @@ Parameters:
         """Handle curve smoothing scale change - update action state."""
         value = scale.get_value()
         if action := self.get_application().lookup_action("curve-smoothing"):
+            action.set_state(GLib.Variant("d", value))
+        self.on_parameter_changed(scale)
+
+    def on_cell_aspect_ratio_changed(self, scale):
+        """Handle cell aspect ratio scale change - update action state."""
+        value = scale.get_value()
+        if action := self.get_application().lookup_action("cell-aspect-ratio"):
             action.set_state(GLib.Variant("d", value))
         self.on_parameter_changed(scale)
 
