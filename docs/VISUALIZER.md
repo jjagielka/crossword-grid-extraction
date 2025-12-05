@@ -2,13 +2,6 @@
 
 A GTK4-based GUI application for visualizing the detection steps and tuning extraction parameters in real-time.
 
-## Versions
-
-- **GTK4** (recommended): `src/visualizer_gtk4.py` - Modern GTK4 interface
-- **GTK3** (legacy): `src/visualizer.py` - Older GTK3 interface
-
-This document describes the GTK4 version. Both versions have feature parity.
-
 ## Features
 
 - **Step-by-step visualization**:
@@ -63,9 +56,6 @@ sudo pacman -S python-gobject gtk4
 brew install pygobject3 gtk4
 ```
 
-### GTK3 Version (Legacy)
-
-If you need to use the GTK3 version instead, replace `gtk4`/`gtk-4.0` with `gtk3`/`gtk-3.0` in the commands above.
 
 ### Python Dependencies
 
@@ -81,20 +71,14 @@ pip install -e ".[gui]"
 
 ### Launch the Application
 
-**GTK4 version (recommended):**
 ```bash
 # Using the launcher script
-./src/visualizer_gtk4.sh
+./visualizer.sh
 
 # With a specific image
-./src/visualizer_gtk4.sh path/to/image.jpg
+./visualizer.sh path/to/image.jpg
 
 # Or directly with Python
-python src/visualizer_gtk4.py test_data/wciska_kig.jpg
-```
-
-**GTK3 version (legacy):**
-```bash
 python src/visualizer.py test_data/wciska_kig.jpg
 ```
 
@@ -242,25 +226,23 @@ Potential improvements:
 ### File Structure
 ```
 src/
-├── visualizer_gtk4.py      # GTK4 application code (recommended)
-├── visualizer_gtk4.ui      # GTK4 UI definition
-├── visualizer_gtk4.sh      # GTK4 launcher script
-├── visualizer.py           # GTK3 application code (legacy)
-└── visualizer.glade        # GTK3 UI definition (legacy)
+├── visualizer.py      # GTK4 application code
+├── visualizer.ui      # GTK4 UI definition
+visualizer.sh          # Launcher script
 ```
 
-### GTK4 Improvements
-The GTK4 version includes:
+### Architecture
+The visualizer uses modern GTK4 with:
 - Modern GTK4 widgets (`GtkHeaderBar`, `GtkPicture`, `GtkFileDialog`)
 - **GAction architecture** for keyboard shortcuts and commands
 - Actions defined declaratively with `Gio.SimpleAction`
 - Keyboard accelerators set via `set_accels_for_action()`
+- Data-driven action setup pattern (minimal boilerplate)
 - Better integration with modern Linux desktops
 - Improved performance and memory usage
-- Active upstream support and future-proofing
 
 ### GAction Architecture
-The GTK4 version uses modern action-based architecture:
+Modern action-based architecture:
 - All commands (Open, Process, Zoom, Quit) are `GAction` objects
 - Toolbar buttons trigger actions via `action-name` property
 - Keyboard shortcuts registered with `set_accels_for_action()`
