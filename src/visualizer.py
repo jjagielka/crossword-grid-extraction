@@ -9,6 +9,8 @@ import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Gdk", "4.0")
+
+# ignore E402
 from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Gio
 import cv2
 import numpy as np
@@ -30,7 +32,9 @@ class CrosswordVisualizerApp(Gtk.Application):
     """Main GTK4 application for crossword grid extraction visualization."""
 
     def __init__(self):
-        super().__init__(application_id="com.crossword.visualizer", flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        super().__init__(
+            application_id="com.crossword.visualizer", flags=Gio.ApplicationFlags.HANDLES_OPEN
+        )
         self.window = None
         self.setup_actions()
 
@@ -245,7 +249,9 @@ class CrosswordVisualizerWindow(Gtk.ApplicationWindow):
             height, width = image.shape[:2]
             new_width = int(width * self.zoom_level)
             new_height = int(height * self.zoom_level)
-            zoomed_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+            zoomed_image = cv2.resize(
+                image, (new_width, new_height), interpolation=cv2.INTER_LINEAR
+            )
         else:
             zoomed_image = image
 
@@ -494,7 +500,9 @@ Parameters:
 
         return vis
 
-    def visualize_cells(self, warped: np.ndarray, cols: int, rows: int, matrix: np.ndarray) -> np.ndarray:
+    def visualize_cells(
+        self, warped: np.ndarray, cols: int, rows: int, matrix: np.ndarray
+    ) -> np.ndarray:
         """Create visualization of cell classification."""
         height, width = warped.shape[:2]
         vis = np.zeros((height, width, 3), dtype=np.uint8)
@@ -520,7 +528,9 @@ Parameters:
 
         return vis
 
-    def visualize_dots(self, warped: np.ndarray, cols: int, rows: int, matrix: np.ndarray) -> np.ndarray:
+    def visualize_dots(
+        self, warped: np.ndarray, cols: int, rows: int, matrix: np.ndarray
+    ) -> np.ndarray:
         """Create visualization highlighting dots."""
         vis = warped.copy()
         height, width = warped.shape[:2]

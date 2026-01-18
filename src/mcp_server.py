@@ -5,22 +5,22 @@ This server exposes crossword grid extraction functionality to LLMs via the Mode
 It allows LLMs to convert crossword images into binary matrices.
 """
 
-import base64
 import sys
-import tempfile
-from pathlib import Path
 from typing import Optional
 
-import cv2
-import numpy as np
 from fastmcp import FastMCP
 from loguru import logger
 
-# Import core extraction functions from library
+from utils import (
+    load_image_from_base64,
+    process_crossword_image,
+    format_matrix,
+)
+
+# Import core extraction functions from library for specific information retrieval
 from extract import (
     extract_grid,
     detect_grid_dimensions,
-    convert_to_matrix,
     GridExtractionError,
     DimensionDetectionError,
 )
@@ -85,84 +85,28 @@ def extract_crossword_grid(
         - Auto-threshold uses Otsu's method for optimal black/white separation
     """
     try:
-        # Validate output format
-        if output_format not in ["csv", "array", "json"]:
-            raise ValueError(
-                f"Unsupported output_format: {output_format}. Must be 'csv', 'array', or 'json'"
-            )
+        # Load image from base64 using central utility
+        image = load_image_from_base64(image_base64)
+        logger.info(f"Loaded image with dimensions: {image.shape[1]}×{image.shape[0]} pixels")
 
-        # Decode base64 image
-        try:
-            image_bytes = base64.b64decode(image_base64)
-        except Exception as e:
-            raise ValueError(f"Invalid base64 image data: {e}")
+        # Use central pipeline to process image
+        grid_matrix, cols, rows = process_crossword_image(
+            image,
+            intensity_threshold=intensity_threshold,
+            detect_dots=detect_dots,
+            use_curved_lines=use_curved_lines,
+            curve_smoothing=curve_smoothing,
+            expected_cell_aspect_ratio=expected_cell_aspect_ratio,
+        )
 
-        # Write to temporary file and load with OpenCV
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
-            tmp_path = Path(tmp_file.name)
-            tmp_file.write(image_bytes)
+        # Use central formatter for output
+        return format_matrix(
+            grid_matrix, cols, rows, output_format=output_format, detect_dots=detect_dots
+        )
 
-        try:
-            # Load image
-            image = cv2.imread(str(tmp_path))
-            if image is None:
-                raise ValueError("Failed to load image. Ensure it's a valid image format (JPEG, PNG, etc.)")
-
-            logger.info(f"Loaded image with dimensions: {image.shape[1]}×{image.shape[0]} pixels")
-
-            # Step 1: Extract and straighten grid
-            logger.info("Step 1/3: Extracting and straightening grid...")
-            warped, max_width, max_height = extract_grid(image)
-            logger.info(f"Extracted grid: {max_width}×{max_height} pixels")
-
-            # Step 2: Detect grid dimensions
-            logger.info("Step 2/3: Detecting grid dimensions...")
-            cols, rows = detect_grid_dimensions(warped, expected_cell_aspect_ratio=expected_cell_aspect_ratio)
-            logger.info(f"Detected: {cols} columns × {rows} rows")
-
-            # Step 3: Convert to matrix
-            logger.info("Step 3/3: Converting to matrix...")
-            grid_matrix = convert_to_matrix(
-                warped,
-                max_width,
-                max_height,
-                rows,
-                cols,
-                intensity_threshold=intensity_threshold,
-                detect_dots=detect_dots,
-                use_curved_lines=use_curved_lines,
-                curve_smoothing=curve_smoothing,
-            )
-
-            # Format output
-            white_cells = int(np.sum(grid_matrix == 1))
-            black_cells = int(np.sum(grid_matrix == 0))
-            dotted_cells = int(np.sum(grid_matrix == 2))
-
-            header = f"Detected: {cols} columns × {rows} rows\n"
-            if detect_dots and dotted_cells > 0:
-                header += f"Grid statistics: {white_cells} white cells, {black_cells} black cells, {dotted_cells} cells with dots\n\n"
-            else:
-                header += f"Grid statistics: {white_cells} white cells, {black_cells} black cells\n\n"
-
-            if output_format == "csv":
-                # CSV format
-                grid_str = "\n".join([",".join(map(str, row)) for row in grid_matrix])
-                return header + grid_str
-
-            elif output_format == "array":
-                # Numpy array string format
-                return header + str(grid_matrix)
-
-            elif output_format == "json":
-                # JSON array format
-                import json
-
-                return header + json.dumps(grid_matrix.tolist(), indent=2)
-
-        finally:
-            # Clean up temporary file
-            tmp_path.unlink(missing_ok=True)
+    except ValueError as e:
+        logger.error(str(e))
+        raise e
 
     except GridExtractionError as e:
         error_msg = (
@@ -221,45 +165,32 @@ def get_grid_info(image_base64: str) -> str:
         ```
     """
     try:
-        # Decode base64 image
-        try:
-            image_bytes = base64.b64decode(image_base64)
-        except Exception as e:
-            raise ValueError(f"Invalid base64 image data: {e}")
+        # Load image using central utility
+        image = load_image_from_base64(image_base64)
+        orig_height, orig_width = image.shape[:2]
 
-        # Write to temporary file and load with OpenCV
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_file:
-            tmp_path = Path(tmp_file.name)
-            tmp_file.write(image_bytes)
+        # Extract grid
+        warped, max_width, max_height = extract_grid(image)
 
-        try:
-            # Load image
-            image = cv2.imread(str(tmp_path))
-            if image is None:
-                raise ValueError("Failed to load image. Ensure it's a valid image format (JPEG, PNG, etc.)")
+        # Detect dimensions
+        cols, rows = detect_grid_dimensions(warped)
 
-            orig_height, orig_width = image.shape[:2]
+        # Calculate cell size
+        cell_width = max_width / cols
+        cell_height = max_height / rows
 
-            # Extract grid
-            warped, max_width, max_height = extract_grid(image)
+        result = f"Image size: {orig_width}×{orig_height} pixels\n"
+        result += f"Extracted grid: {max_width}×{max_height} pixels\n"
+        result += f"Detected dimensions: {cols} columns × {rows} rows\n"
+        result += f"Estimated cell size: {cell_width:.1f}×{cell_height:.1f} pixels\n"
 
-            # Detect dimensions
-            cols, rows = detect_grid_dimensions(warped)
+        return result
 
-            # Calculate cell size
-            cell_width = max_width / cols
-            cell_height = max_height / rows
-
-            result = f"Image size: {orig_width}×{orig_height} pixels\n"
-            result += f"Extracted grid: {max_width}×{max_height} pixels\n"
-            result += f"Detected dimensions: {cols} columns × {rows} rows\n"
-            result += f"Estimated cell size: {cell_width:.1f}×{cell_height:.1f} pixels\n"
-
-            return result
-
-        finally:
-            # Clean up temporary file
-            tmp_path.unlink(missing_ok=True)
+    except (GridExtractionError, DimensionDetectionError) as e:
+        raise ValueError(str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise ValueError(f"Unexpected error: {type(e).__name__}: {e}")
 
     except (GridExtractionError, DimensionDetectionError) as e:
         raise ValueError(str(e))
@@ -272,8 +203,12 @@ if __name__ == "__main__":
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="MCP server for crossword grid extraction")
-    parser.add_argument("--http", action="store_true", help="Run in HTTP/SSE mode (for systemd deployment)")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose (DEBUG) logging")
+    parser.add_argument(
+        "--http", action="store_true", help="Run in HTTP/SSE mode (for systemd deployment)"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Enable verbose (DEBUG) logging"
+    )
     args = parser.parse_args()
 
     # Configure logging level

@@ -57,7 +57,10 @@ def order_points(pts: np.ndarray) -> np.ndarray:
 
 
 def extract_grid(
-    img: np.ndarray, contour_epsilon: float = 0.02, adaptive_block_size: int = 11, adaptive_c: int = 2
+    img: np.ndarray,
+    contour_epsilon: float = 0.02,
+    adaptive_block_size: int = 11,
+    adaptive_c: int = 2,
 ) -> tuple[np.ndarray, int, int]:
     """Extract and straighten crossword grid from image using perspective transform.
 
@@ -88,7 +91,12 @@ def extract_grid(
     # 2. Preprocessing for Grid Detection
     # Use adaptive threshold to handle shadows and lighting variations
     thresh = cv2.adaptiveThreshold(
-        gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, adaptive_block_size, adaptive_c
+        gray,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV,
+        adaptive_block_size,
+        adaptive_c,
     )
 
     # Find the largest quadrilateral contour
@@ -126,7 +134,8 @@ def extract_grid(
     max_height = max(int(heightA), int(heightB))
 
     dst = np.array(
-        [[0, 0], [max_width - 1, 0], [max_width - 1, max_height - 1], [0, max_height - 1]], dtype="float32"
+        [[0, 0], [max_width - 1, 0], [max_width - 1, max_height - 1], [0, max_height - 1]],
+        dtype="float32",
     )
 
     transform_matrix = cv2.getPerspectiveTransform(rect, dst)
@@ -227,11 +236,13 @@ def detect_grid_dimensions(
                 max_gap = spacing_gaps[max_gap_idx]
                 # Use 20% threshold to detect bimodal distribution
                 if max_gap > median_col_width * 0.2:
-                    larger_spacings = sorted_diffs[max_gap_idx + 1:]
+                    larger_spacings = sorted_diffs[max_gap_idx + 1 :]
                     # Require at least 2 larger spacings (relaxed from 3 for smaller grids)
                     if len(larger_spacings) >= 2:
                         refined_min_distance = int(np.median(larger_spacings) * 0.85)
-                        peaks_cols_refined, _ = find_peaks(neg_col_proj, distance=refined_min_distance, prominence=col_prominence)
+                        peaks_cols_refined, _ = find_peaks(
+                            neg_col_proj, distance=refined_min_distance, prominence=col_prominence
+                        )
                         if len(peaks_cols_refined) > 1:
                             col_diffs_refined = np.diff(peaks_cols_refined)
                             median_col_width_refined = np.median(col_diffs_refined)
@@ -240,7 +251,9 @@ def detect_grid_dimensions(
                                 estimated_cols = estimated_cols_refined
                                 peaks_cols = peaks_cols_refined
                                 median_col_width = median_col_width_refined
-                                logger.debug(f"Refined column detection (bimodal distribution): {len(peaks_cols)} peaks → {estimated_cols} columns")
+                                logger.debug(
+                                    f"Refined column detection (bimodal distribution): {len(peaks_cols)} peaks → {estimated_cols} columns"
+                                )
 
     if len(peaks_rows) > 1:
         row_diffs = np.diff(peaks_rows)
@@ -255,11 +268,13 @@ def detect_grid_dimensions(
                 max_gap_idx = np.argmax(spacing_gaps)
                 max_gap = spacing_gaps[max_gap_idx]
                 if max_gap > median_row_height * 0.2:
-                    larger_spacings = sorted_diffs[max_gap_idx + 1:]
+                    larger_spacings = sorted_diffs[max_gap_idx + 1 :]
                     # Require at least 2 larger spacings (relaxed from 3 for smaller grids)
                     if len(larger_spacings) >= 2:
                         refined_min_distance = int(np.median(larger_spacings) * 0.85)
-                        peaks_rows_refined, _ = find_peaks(neg_row_proj, distance=refined_min_distance, prominence=row_prominence)
+                        peaks_rows_refined, _ = find_peaks(
+                            neg_row_proj, distance=refined_min_distance, prominence=row_prominence
+                        )
                         if len(peaks_rows_refined) > 1:
                             row_diffs_refined = np.diff(peaks_rows_refined)
                             median_row_height_refined = np.median(row_diffs_refined)
@@ -268,7 +283,9 @@ def detect_grid_dimensions(
                                 estimated_rows = estimated_rows_refined
                                 peaks_rows = peaks_rows_refined
                                 median_row_height = median_row_height_refined
-                                logger.debug(f"Refined row detection (bimodal distribution): {len(peaks_rows)} peaks → {estimated_rows} rows")
+                                logger.debug(
+                                    f"Refined row detection (bimodal distribution): {len(peaks_rows)} peaks → {estimated_rows} rows"
+                                )
 
     # Cross-validation: Use successfully detected dimension to validate the other
     # If one dimension (usually rows) was successfully refined and the other wasn't,
@@ -276,10 +293,14 @@ def detect_grid_dimensions(
     if estimated_rows > 0 and median_row_height > 0 and estimated_cols > 30:
         # Row detection succeeded but column detection seems to have too many peaks
         # Assume roughly square cells and use row cell height as minimum distance for columns
-        logger.debug(f"Column detection found {estimated_cols} cols (suspicious). Using row cell size for guidance...")
+        logger.debug(
+            f"Column detection found {estimated_cols} cols (suspicious). Using row cell size for guidance..."
+        )
 
         min_col_distance_cross = int(median_row_height * 0.85)
-        peaks_cols_cross, _ = find_peaks(neg_col_proj, distance=min_col_distance_cross, prominence=col_prominence)
+        peaks_cols_cross, _ = find_peaks(
+            neg_col_proj, distance=min_col_distance_cross, prominence=col_prominence
+        )
 
         if len(peaks_cols_cross) > 1:
             col_diffs_cross = np.diff(peaks_cols_cross)
@@ -290,19 +311,26 @@ def detect_grid_dimensions(
                 estimated_cols = estimated_cols_cross
                 peaks_cols = peaks_cols_cross
                 median_col_width = median_col_width_cross
-                logger.debug(f"Cross-validated column detection: {len(peaks_cols)} peaks → {estimated_cols} columns")
+                logger.debug(
+                    f"Cross-validated column detection: {len(peaks_cols)} peaks → {estimated_cols} columns"
+                )
 
     # Use expected aspect ratio to refine detection if specified and detection seems off
-    if (median_col_width > 0 and median_row_height > 0 and
-        estimated_rows > 0 and estimated_cols > 0 and
-        expected_cell_aspect_ratio != 1.0):
-
+    if (
+        median_col_width > 0
+        and median_row_height > 0
+        and estimated_rows > 0
+        and estimated_cols > 0
+        and expected_cell_aspect_ratio != 1.0
+    ):
         cell_aspect = median_col_width / median_row_height
         aspect_error = abs(cell_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio
 
         # If detected aspect differs significantly from expected (>20%), try to refine
         if aspect_error > 0.20:
-            logger.debug(f"Cell aspect {cell_aspect:.3f} differs from expected {expected_cell_aspect_ratio:.3f}, attempting refinement...")
+            logger.debug(
+                f"Cell aspect {cell_aspect:.3f} differs from expected {expected_cell_aspect_ratio:.3f}, attempting refinement..."
+            )
 
             # Calculate what the dimensions should be based on expected aspect ratio
             # Keep the dimension with more detected peaks (more reliable)
@@ -311,7 +339,9 @@ def detect_grid_dimensions(
                 expected_cell_height = median_col_width / expected_cell_aspect_ratio
                 estimated_rows_refined = round(height / expected_cell_height)
                 if 5 <= estimated_rows_refined <= 50:
-                    logger.debug(f"Refined rows from {estimated_rows} to {estimated_rows_refined} based on expected aspect ratio")
+                    logger.debug(
+                        f"Refined rows from {estimated_rows} to {estimated_rows_refined} based on expected aspect ratio"
+                    )
                     estimated_rows = estimated_rows_refined
                     median_row_height = height / estimated_rows
             else:
@@ -319,7 +349,9 @@ def detect_grid_dimensions(
                 expected_cell_width = median_row_height * expected_cell_aspect_ratio
                 estimated_cols_refined = round(width / expected_cell_width)
                 if 5 <= estimated_cols_refined <= 50:
-                    logger.debug(f"Refined cols from {estimated_cols} to {estimated_cols_refined} based on expected aspect ratio")
+                    logger.debug(
+                        f"Refined cols from {estimated_cols} to {estimated_cols_refined} based on expected aspect ratio"
+                    )
                     estimated_cols = estimated_cols_refined
                     median_col_width = width / estimated_cols
 
@@ -339,20 +371,34 @@ def detect_grid_dimensions(
         cell_aspect = median_col_width / median_row_height
 
         ratio_error = abs(image_ratio - grid_ratio) / image_ratio * 100
-        cell_aspect_error = abs(cell_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio * 100
+        cell_aspect_error = (
+            abs(cell_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio * 100
+        )
 
-        logger.debug(f"Aspect Ratio Check:")
-        logger.debug(f"  Image ratio: {image_ratio:.3f}, Grid ratio: {grid_ratio:.3f}, Error: {ratio_error:.1f}%")
-        logger.debug(f"  Cell aspect: {cell_aspect:.3f} (expected: {expected_cell_aspect_ratio:.3f}), Error: {cell_aspect_error:.1f}%")
+        logger.debug("Aspect Ratio Check:")
+        logger.debug(
+            f"  Image ratio: {image_ratio:.3f}, Grid ratio: {grid_ratio:.3f}, Error: {ratio_error:.1f}%"
+        )
+        logger.debug(
+            f"  Cell aspect: {cell_aspect:.3f} (expected: {expected_cell_aspect_ratio:.3f}), Error: {cell_aspect_error:.1f}%"
+        )
 
         # Warning if ratios don't match (possible detection error)
         if ratio_error > 10:
-            logger.warning(f"Image ratio ({image_ratio:.3f}) differs significantly from grid ratio ({grid_ratio:.3f})")
-            logger.warning(f"This may indicate incorrect dimension detection. Expected ratio error < 10%, got {ratio_error:.1f}%")
+            logger.warning(
+                f"Image ratio ({image_ratio:.3f}) differs significantly from grid ratio ({grid_ratio:.3f})"
+            )
+            logger.warning(
+                f"This may indicate incorrect dimension detection. Expected ratio error < 10%, got {ratio_error:.1f}%"
+            )
 
         if cell_aspect_error > 15:
-            logger.warning(f"Cells don't match expected aspect ratio (actual={cell_aspect:.3f}, expected={expected_cell_aspect_ratio:.3f})")
-            logger.warning(f"This may indicate incorrect dimension detection. Try adjusting expected_cell_aspect_ratio parameter")
+            logger.warning(
+                f"Cells don't match expected aspect ratio (actual={cell_aspect:.3f}, expected={expected_cell_aspect_ratio:.3f})"
+            )
+            logger.warning(
+                "This may indicate incorrect dimension detection. Try adjusting expected_cell_aspect_ratio parameter"
+            )
 
     # Validate detected dimensions
     if estimated_rows < 1 or estimated_cols < 1:
@@ -374,10 +420,7 @@ def detect_grid_dimensions(
 
 
 def detect_curved_grid_lines(
-    img: np.ndarray,
-    rows: int,
-    cols: int,
-    smoothing_factor: float = 100.0
+    img: np.ndarray, rows: int, cols: int, smoothing_factor: float = 100.0
 ) -> tuple[list[UnivariateSpline], list[UnivariateSpline]]:
     """Detect actual curved grid lines using edge detection and spline fitting.
 
@@ -436,7 +479,7 @@ def detect_curved_grid_lines(
 
             # Sample points along the width
             num_samples = min(50, width // 10)  # Sample every ~10 pixels
-            for x in np.linspace(0, width-1, num_samples, dtype=int):
+            for x in np.linspace(0, width - 1, num_samples, dtype=int):
                 # Look for edge in vertical neighborhood
                 search_height = min(15, height // (rows * 2))
                 y_search_min = max(0, actual_y - search_height)
@@ -458,7 +501,7 @@ def detect_curved_grid_lines(
                     # Fit spline: y = f(x)
                     spline = UnivariateSpline(x_coords, y_coords, s=smoothing_factor, k=3)
                     horizontal_splines.append(spline)
-                except:
+                except Exception:
                     # Fallback to straight line
                     horizontal_splines.append(lambda x, y=actual_y: np.full_like(x, y, dtype=float))
             else:
@@ -493,7 +536,7 @@ def detect_curved_grid_lines(
 
             # Sample points along the height
             num_samples = min(50, height // 10)
-            for y in np.linspace(0, height-1, num_samples, dtype=int):
+            for y in np.linspace(0, height - 1, num_samples, dtype=int):
                 # Look for edge in horizontal neighborhood
                 search_width = min(15, width // (cols * 2))
                 x_search_min = max(0, actual_x - search_width)
@@ -514,7 +557,7 @@ def detect_curved_grid_lines(
                     # Fit spline: x = f(y)
                     spline = UnivariateSpline(y_coords, x_coords, s=smoothing_factor, k=3)
                     vertical_splines.append(spline)
-                except:
+                except Exception:
                     # Fallback to straight line
                     vertical_splines.append(lambda y, x=actual_x: np.full_like(y, x, dtype=float))
             else:
@@ -524,7 +567,9 @@ def detect_curved_grid_lines(
             # No edges found, use expected position
             vertical_splines.append(lambda y, x=expected_x: np.full_like(y, x, dtype=float))
 
-    logger.debug(f"Detected {len(horizontal_splines)} horizontal and {len(vertical_splines)} vertical curved grid lines")
+    logger.debug(
+        f"Detected {len(horizontal_splines)} horizontal and {len(vertical_splines)} vertical curved grid lines"
+    )
 
     return horizontal_splines, vertical_splines
 
@@ -654,14 +699,15 @@ def convert_to_matrix(
 
     # Determine if we should use local adaptive thresholding
     # Check for lighting gradient by comparing corner intensities
-    use_local_threshold = False
     global_threshold = None
 
     if intensity_threshold is None:
         # Sample corners to detect lighting gradient
         corner_size = min(max_height // 4, max_width // 4)
         tl_corner = warped_gray[0:corner_size, 0:corner_size]
-        br_corner = warped_gray[max_height-corner_size:max_height, max_width-corner_size:max_width]
+        br_corner = warped_gray[
+            max_height - corner_size : max_height, max_width - corner_size : max_width
+        ]
 
         tl_mean = np.mean(tl_corner)
         br_mean = np.mean(br_corner)
@@ -671,11 +717,15 @@ def convert_to_matrix(
         # Apply CLAHE only if there are actual shadows (dark regions with intensity < 160)
         if gradient_diff > 30:
             min_corner = min(tl_mean, br_mean)
-            logger.debug(f"Detected lighting gradient: TL={tl_mean:.1f}, BR={br_mean:.1f}, diff={gradient_diff:.1f}")
+            logger.debug(
+                f"Detected lighting gradient: TL={tl_mean:.1f}, BR={br_mean:.1f}, diff={gradient_diff:.1f}"
+            )
 
             # Only apply CLAHE if there are actual shadows (darkest corner < 160)
             if min_corner < 160:
-                logger.debug(f"Applying CLAHE preprocessing to improve contrast in shadowed regions (min={min_corner:.1f})")
+                logger.debug(
+                    f"Applying CLAHE preprocessing to improve contrast in shadowed regions (min={min_corner:.1f})"
+                )
 
                 # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
                 # This improves local contrast while avoiding over-amplification
@@ -683,16 +733,24 @@ def convert_to_matrix(
                 warped_gray = clahe.apply(warped_gray)
 
                 # After CLAHE, we can use global threshold (local contrast is improved)
-                global_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
+                global_threshold = cv2.threshold(
+                    warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+                )[0]
                 logger.debug(f"Auto-detected threshold after CLAHE: {global_threshold:.1f}")
             else:
                 # Gradient but no shadows - just normal lighting variation
-                logger.debug(f"Gradient present but no shadows (min={min_corner:.1f}), using global threshold")
-                global_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
+                logger.debug(
+                    f"Gradient present but no shadows (min={min_corner:.1f}), using global threshold"
+                )
+                global_threshold = cv2.threshold(
+                    warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+                )[0]
                 logger.debug(f"Auto-detected global threshold: {global_threshold:.1f}")
         else:
             # Use global Otsu's method
-            global_threshold = cv2.threshold(warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[0]
+            global_threshold = cv2.threshold(
+                warped_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+            )[0]
             logger.debug(f"Auto-detected global threshold: {global_threshold:.1f}")
     else:
         global_threshold = intensity_threshold
@@ -708,7 +766,9 @@ def convert_to_matrix(
             )
             logger.debug("Using curved grid line detection for cell extraction")
         except Exception as e:
-            logger.warning(f"Curved grid line detection failed: {e}. Falling back to straight lines.")
+            logger.warning(
+                f"Curved grid line detection failed: {e}. Falling back to straight lines."
+            )
             use_curved_lines = False
 
     # Process each cell
@@ -789,14 +849,3 @@ def convert_to_matrix(
         )
 
     return grid_matrix
-
-
-def save_matrix_to_csv(grid_matrix: np.ndarray, output_path: Path) -> None:
-    """Save grid matrix to CSV file.
-
-    Args:
-        grid_matrix: Binary matrix to save
-        output_path: Path where CSV should be saved
-    """
-    np.savetxt(output_path, grid_matrix, fmt="%d", delimiter=",")
-    logger.info(f"Saved matrix to {output_path}")

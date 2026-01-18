@@ -8,52 +8,24 @@ and digitizing crossword puzzle grids from images into binary matrices.
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
 
 import cv2
 from loguru import logger
+from utils import (
+    load_image,
+    save_matrix_to_csv,
+    save_matrix_to_json,
+    process_crossword_image,
+    format_matrix,
+)
 
-# Import core extraction functions from library
+# Import core extraction functions from library for specific commands
 from extract import (
     GridExtractionError,
     DimensionDetectionError,
     extract_grid,
     detect_grid_dimensions,
-    convert_to_matrix,
-    save_matrix_to_csv,
 )
-
-
-def load_image(image_path: Path) -> cv2.Mat:
-    """Load and validate an image file.
-
-    Args:
-        image_path: Path to input crossword image
-
-    Returns:
-        Loaded OpenCV image array
-
-    Raises:
-        FileNotFoundError: If input file doesn't exist
-        ValueError: If file is not a valid image
-    """
-    # Validate input file
-    if not image_path.exists():
-        raise FileNotFoundError(f"Input file not found: {image_path}")
-
-    if not image_path.is_file():
-        raise ValueError(f"Input path is not a file: {image_path}")
-
-    # Load and validate image
-    image = cv2.imread(str(image_path))
-    if image is None:
-        raise ValueError(
-            f"Failed to load image from {image_path}. "
-            f"Ensure the file is a valid image format (JPEG, PNG, etc.)"
-        )
-
-    logger.info(f"Loaded image: {image_path} ({image.shape[1]}x{image.shape[0]})")
-    return image
 
 
 def cmd_extract(args: argparse.Namespace) -> None:
@@ -91,7 +63,7 @@ def cmd_size(args: argparse.Namespace) -> None:
     warped, max_width, max_height = extract_grid(image)
 
     # Detect dimensions on the warped/straightened grid
-    cell_aspect_ratio = getattr(args, 'cell_aspect_ratio', 1.0)
+    cell_aspect_ratio = getattr(args, "cell_aspect_ratio", 1.0)
     cols, rows = detect_grid_dimensions(warped, expected_cell_aspect_ratio=cell_aspect_ratio)
     logger.info(f"Detected grid dimensions: {cols} columns x {rows} rows")
 
@@ -104,50 +76,35 @@ def cmd_convert(args: argparse.Namespace) -> None:
     """
     image = load_image(args.input)
 
-    # Step 1: Extract and straighten grid
-    logger.info("Step 1/3: Extracting grid...")
-    warped, max_width, max_height = extract_grid(image)
-
-    if args.visualize:
-        cv2.imwrite("1_extracted_grid.jpg", warped)
-        logger.debug("Saved: 1_extracted_grid.jpg")
-
-    # Step 2: Detect dimensions
-    logger.info("Step 2/3: Detecting grid dimensions...")
-    cols, rows = detect_grid_dimensions(warped, expected_cell_aspect_ratio=args.cell_aspect_ratio)
-    logger.info(f"Detected: {cols} columns x {rows} rows")
-
-    # Step 3: Convert to matrix
-    step_msg = "Step 3/3: Converting to matrix"
-    if args.detect_dots:
-        step_msg += " (with dot detection)..."
-    else:
-        step_msg += "..."
-    logger.info(step_msg)
-
-    grid_matrix = convert_to_matrix(
-        warped,
-        max_width,
-        max_height,
-        rows,
-        cols,
+    grid_matrix, cols, rows = process_crossword_image(
+        image,
         intensity_threshold=args.threshold,
         detect_dots=args.detect_dots,
         use_curved_lines=args.use_curved_lines,
         curve_smoothing=args.curve_smoothing,
+        expected_cell_aspect_ratio=args.cell_aspect_ratio,
     )
 
-    # Save to CSV
-    save_matrix_to_csv(grid_matrix, args.output)
+    # Determine output path and format
+    output_path = args.output
+    if output_path is None:
+        output_path = Path(f"crossword_grid.{args.format}")
 
-    # Print matrix to console
-    if args.detect_dots:
-        logger.info("\nGrid Matrix (0=Black, 1=White, 2=White+Dot):")
+    # Save to file
+    if args.format == "json":
+        save_matrix_to_json(grid_matrix, output_path)
     else:
-        logger.info("\nGrid Matrix (0=Black, 1=White):")
-    print(grid_matrix)
+        save_matrix_to_csv(grid_matrix, output_path)
 
-    logger.info(f"\n✓ Conversion complete! Output saved to: {args.output}")
+    # Print matrix to console using central formatter
+    logger.info(
+        "\n"
+        + format_matrix(
+            grid_matrix, cols, rows, output_format="array", detect_dots=args.detect_dots
+        )
+    )
+
+    logger.info(f"\n✓ Conversion complete! Output saved to: {output_path}")
 
 
 def _create_visualization(image: cv2.Mat, output_path: Path) -> None:
@@ -188,8 +145,11 @@ Examples:
   # Detect grid dimensions only
   %(prog)s --input crossword.jpg size
 
-  # Full conversion to CSV
+  # Full conversion to CSV (default)
   %(prog)s --input crossword.jpg convert --output grid.csv
+
+  # Full conversion to JSON
+  %(prog)s --input crossword.jpg convert --format json
 
   # Use custom intensity threshold
   %(prog)s --input crossword.jpg convert --output grid.csv --threshold 150
@@ -207,13 +167,15 @@ Examples:
 
     # Global arguments
     parser.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=Path,
         required=True,
         help="Path to input crossword image (JPEG, PNG, etc.)",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose (TRACE level) logging",
     )
@@ -227,7 +189,8 @@ Examples:
         help="Extract and straighten the crossword grid",
     )
     extract_parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default="extracted_grid.jpg",
         help="Path for output image file (default: extracted_grid.jpg)",
@@ -253,16 +216,24 @@ Examples:
     # Convert command
     convert_parser = subparsers.add_parser(
         "convert",
-        help="Full pipeline: extract, detect dimensions, and convert to CSV",
+        help="Full pipeline: extract, detect dimensions, and convert to CSV/JSON",
     )
     convert_parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
-        default="crossword_grid.csv",
-        help="Path for output CSV file (default: crossword_grid.csv)",
+        help="Path for output file (default: crossword_grid.csv or crossword_grid.json)",
     )
     convert_parser.add_argument(
-        "-t", "--threshold",
+        "-f",
+        "--format",
+        choices=["csv", "json"],
+        default="csv",
+        help="Output format (default: csv)",
+    )
+    convert_parser.add_argument(
+        "-t",
+        "--threshold",
         type=int,
         help="Manual intensity threshold for black/white classification (auto-detected if not specified)",
     )
