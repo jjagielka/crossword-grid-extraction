@@ -99,16 +99,40 @@ def extract_grid(
         adaptive_c,
     )
 
-    # Find the largest quadrilateral contour
+    # Find the largest quadrilateral contour.
+    # Strategy: walk top-N largest contours (filtered by min area). For each,
+    # try progressively larger approxPolyDP epsilons; if none yield 4 vertices,
+    # fall back to a rotated minAreaRect when it tightly bounds the contour.
+    img_h, img_w = gray.shape
+    img_area = img_h * img_w
+    min_grid_area = img_area * 0.05  # Grid must be at least 5% of image
+
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
+    epsilon_factors = (contour_epsilon, 0.03, 0.04, 0.05, 0.08)
     display_cnt = None
-    for cnt in contours:
+    for cnt in contours[:10]:
+        area = cv2.contourArea(cnt)
+        if area < min_grid_area:
+            break  # Subsequent contours are even smaller
+
         perimeter = cv2.arcLength(cnt, True)
-        approx = cv2.approxPolyDP(cnt, contour_epsilon * perimeter, True)
-        if len(approx) == 4:
-            display_cnt = approx
+        for eps in epsilon_factors:
+            approx = cv2.approxPolyDP(cnt, eps * perimeter, True)
+            if len(approx) == 4:
+                display_cnt = approx
+                break
+        if display_cnt is not None:
+            break
+
+        # Fallback: a rotated bounding rectangle. Accept only when it closely
+        # matches the contour (well-approximated by a rectangle).
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect).astype(np.int32)
+        box_area = cv2.contourArea(box)
+        if box_area > 0 and area / box_area >= 0.85:
+            display_cnt = box.reshape(-1, 1, 2)
             break
 
     if display_cnt is None:
@@ -144,6 +168,34 @@ def extract_grid(
     logger.debug(f"Extracted grid with dimensions: {max_width}x{max_height}")
 
     return warped, max_width, max_height
+
+
+def _estimate_period_autocorr(
+    projection: np.ndarray, dim_size: int
+) -> Optional[int]:
+    """Estimate dominant cell period in a projection profile via autocorrelation.
+
+    Robust to spurious peaks created by in-cell content (handwritten letters,
+    arrow markers, etc.) that defeat direct peak detection. The first
+    significant peak in the autocorrelation gives the fundamental cell period.
+
+    Returns None if no clear period is found.
+    """
+    sig = projection.astype(float) - projection.mean()
+    if not np.any(sig):
+        return None
+    autocorr = np.correlate(sig, sig, mode="full")[len(sig) - 1 :]
+    if autocorr[0] <= 0:
+        return None
+    autocorr = autocorr / autocorr[0]
+
+    min_lag = max(5, dim_size // 40)  # cells can't be smaller than dim/40
+    max_lag = max(min_lag + 1, dim_size // 3)  # nor bigger than dim/3
+    valid = autocorr[min_lag : max_lag + 1]
+    peaks, _ = find_peaks(valid, prominence=0.02, distance=min_lag)
+    if len(peaks) == 0:
+        return None
+    return int(peaks[0]) + min_lag
 
 
 def detect_grid_dimensions(
@@ -354,6 +406,46 @@ def detect_grid_dimensions(
                     )
                     estimated_cols = estimated_cols_refined
                     median_col_width = width / estimated_cols
+
+    # Autocorrelation refinement: when peak detection produces a cell aspect
+    # that disagrees strongly with the expected aspect, the projection profile
+    # is being polluted by in-cell content (handwriting, markers). Autocorr is
+    # robust to that pollution because it captures the *dominant* period.
+    if median_col_width > 0 and median_row_height > 0:
+        cell_aspect = median_col_width / median_row_height
+        aspect_error = abs(cell_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio
+        if aspect_error > 0.30:
+            # Use binarized image for cleaner periodicity signal.
+            _, bw = cv2.threshold(gray, 0, 1, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+            row_proj_bw = np.sum(bw, axis=1).astype(float)
+            col_proj_bw = np.sum(bw, axis=0).astype(float)
+
+            ac_period_h = _estimate_period_autocorr(row_proj_bw, height)
+            ac_period_w = _estimate_period_autocorr(col_proj_bw, width)
+
+            if ac_period_h and ac_period_w:
+                ac_rows = round(height / ac_period_h)
+                ac_cols = round(width / ac_period_w)
+                ac_aspect = ac_period_w / ac_period_h
+                ac_aspect_error = (
+                    abs(ac_aspect - expected_cell_aspect_ratio) / expected_cell_aspect_ratio
+                )
+                # Adopt the autocorr result only when it produces sane dimensions
+                # AND a cell aspect closer to expected than the peak-based result.
+                if (
+                    5 <= ac_rows <= 50
+                    and 5 <= ac_cols <= 50
+                    and ac_aspect_error < aspect_error
+                ):
+                    logger.debug(
+                        f"Autocorr override: peak-based={estimated_cols}x{estimated_rows} "
+                        f"(aspect={cell_aspect:.2f}) → autocorr={ac_cols}x{ac_rows} "
+                        f"(aspect={ac_aspect:.2f}, periods={ac_period_w}x{ac_period_h})"
+                    )
+                    estimated_cols = ac_cols
+                    estimated_rows = ac_rows
+                    median_col_width = float(ac_period_w)
+                    median_row_height = float(ac_period_h)
 
     logger.debug("--- Grid Dimension Analysis ---")
     logger.debug(f"Image Size: {width}x{height} pixels")

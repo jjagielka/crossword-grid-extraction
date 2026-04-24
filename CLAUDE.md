@@ -160,6 +160,11 @@ The `Application` class serves as the main interface:
 
 ## Recent Improvements
 
+### v0.3.0 - Robust Detection for Handwritten / Magazine-Page Crosswords
+- **Relaxed contour selection in `extract_grid`**: Walks the top-10 largest contours (≥5% of image area), trying epsilons 0.02 → 0.08 to reduce each to 4 vertices. Falls back to `cv2.minAreaRect` when a contour is well-bounded by a rotated rectangle (≥85% fill). Fixes cases where the grid contour has 8+ vertices at the default epsilon, or where the page outline isn't 4-sided at all.
+- **Autocorrelation-based dimension refinement in `detect_grid_dimensions`**: Added `_estimate_period_autocorr()`. When peak detection produces a cell aspect that deviates >30% from expected, autocorrelation of the binarized projection profile is run. The first significant autocorr peak gives the dominant cell period — robust to spurious peaks from handwritten letters or arrow markers inside cells. Adopts the autocorr result only when it produces sane dimensions AND a cell aspect closer to expected.
+- **Verified test cases (testing/)**: 5/5 Polish-style filled-in crosswords now detect correctly, including a magazine-page scan where the grid is not the largest 4-sided contour.
+
 ### v0.2.0 - Dot Detection Feature
 - **Solution marker detection**: Automatically detects black dots in white cells
 - **Ternary output**: Matrix now supports 0 (black), 1 (white), 2 (white with dot)
@@ -225,25 +230,27 @@ Uses configurable center crop (default 25% margin on each side) to avoid:
 - Margin is adjustable via `cell_margin` parameter
 
 ### Contour Detection
-Requires the crossword to be the largest quadrilateral in the image. May fail if:
-- Multiple large rectangles are present
-- The grid is not the dominant feature
-- Heavy distortion prevents quadrilateral approximation
+The grid must be among the top-10 largest contours and cover ≥5% of the image. The detector tries epsilons 0.02 → 0.08 for `approxPolyDP` to find a 4-vertex approximation, and falls back to a rotated `minAreaRect` if the contour is tightly rectangle-shaped. Failure modes:
+- No contour exceeds the 5% area threshold
+- The grid is heavily distorted (rectangle fit < 85% of contour area)
+- Multiple non-grid rectangles dwarf the actual grid
 
 Use `--visualize` flag to debug contour detection issues.
 
 ### Dimension Detection Robustness
-The median-based approach for dimension detection handles:
-- Missing grid lines (faint printing)
+The detection pipeline handles:
+- Missing grid lines (faint printing) via median-based cell size
 - Partially visible grids
 - Non-uniform cell sizes (within reason)
 - Double-detected grid lines (bimodal distribution refinement)
 - Over-detection correction (cross-validation between dimensions)
+- **In-cell content pollution** (handwritten letters, arrow markers): autocorrelation refinement kicks in when the peak-based cell aspect is >30% off from expected, finding the dominant period instead of counting every spurious peak
 
 **Verified Test Cases**:
 - 17×12 grid (non-square): Successfully detected with cross-validation
 - Handles grids where peak detection initially finds 35 columns → refined to 17
-- Handles grids where peak detection initially finds 24-25 rows → refined to 12
+- Handles grids where peak detection initially finds 24-27 rows → refined to 12 via autocorrelation
+- Filled-in Polish crosswords with handwritten letters: all 12×17 grids in `testing/` correctly detected
 
 However, it requires at least 2 detected lines per axis. If detection fails, try:
 - Improving image contrast
